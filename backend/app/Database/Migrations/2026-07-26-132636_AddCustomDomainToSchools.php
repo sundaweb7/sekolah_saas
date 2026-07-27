@@ -9,12 +9,6 @@ class AddCustomDomainToSchools extends Migration
     public function up()
     {
         $fields = [
-            'custom_domain' => [
-                'type'       => 'VARCHAR',
-                'constraint' => '150',
-                'null'       => true,
-                'after'      => 'subdomain',
-            ],
             'custom_domain_status' => [
                 'type'       => 'ENUM',
                 'constraint' => ['pending', 'processing', 'active', 'rejected'],
@@ -27,7 +21,6 @@ class AddCustomDomainToSchools extends Migration
 
     public function down()
     {
-        $this->forge->dropColumn('schools', 'custom_domain');
         $this->forge->dropColumn('schools', 'custom_domain_status');
     }
 }
