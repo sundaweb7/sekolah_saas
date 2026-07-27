@@ -23,6 +23,16 @@ const registerSchema = z.object({
   password: z.string().min(6, { message: 'Kata sandi minimal 6 karakter' }),
 });
 
+const getBaseDomain = () => {
+  if (typeof window === 'undefined') return 'paudku.id';
+  const hostname = window.location.hostname;
+  const parts = hostname.split('.');
+  if (hostname.endsWith('.my.id')) {
+    return parts.slice(-3).join('.');
+  }
+  return parts.slice(-2).join('.');
+};
+
 export default function Login() {
   const navigate = useNavigate();
   const { login } = useAuth();
@@ -183,7 +193,7 @@ export default function Login() {
                   className="flex-1 bg-transparent py-2 px-3 text-sm text-white outline-none"
                 />
                 <span className="bg-zinc-900 px-3 py-2 text-sm text-zinc-500 font-mono border-l border-zinc-850">
-                  .paudku.id
+                  .{getBaseDomain()}
                 </span>
               </div>
               {regErrors.subdomain && <p className="mt-1 text-xs text-red-400">{regErrors.subdomain.message}</p>}

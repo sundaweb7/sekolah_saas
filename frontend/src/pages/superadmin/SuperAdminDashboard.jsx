@@ -13,11 +13,24 @@ function getBackendBase() {
   if (lastPart === 'localhost' || lastPart === '127' || parts.length === 1) {
     return 'http://localhost:8080';
   }
-  const baseHost = parts.slice(-2).join('.');
-  return `http://${baseHost}`;
+  let baseHost;
+  if (hostname.endsWith('.my.id')) {
+    baseHost = parts.slice(-3).join('.');
+  } else {
+    baseHost = parts.slice(-2).join('.');
+  }
+  const protocol = window.location.protocol;
+  return `${protocol}//${baseHost}`;
 }
 
-const BACKEND_BASE = getBackendBase();
+function getBaseDomain() {
+  const hostname = window.location.hostname;
+  const parts = hostname.split('.');
+  if (hostname.endsWith('.my.id')) {
+    return parts.slice(-3).join('.');
+  }
+  return parts.slice(-2).join('.');
+}
 
 export default function SuperAdminDashboard() {
   const [activeTab, setActiveTab] = useState('overview');
@@ -402,7 +415,7 @@ export default function SuperAdminDashboard() {
                       {schools.slice(0, 5).map(s => (
                         <tr key={s.id}>
                           <td className="py-3.5 font-bold text-zinc-850">{s.name}</td>
-                          <td className="py-3.5 text-zinc-550">{s.subdomain}.paudku.id</td>
+                          <td className="py-3.5 text-zinc-550">{s.subdomain}.{getBaseDomain()}</td>
                           <td className="py-3.5 text-right">
                             <span className={`inline-flex items-center rounded-full px-2.5 py-0.5 text-[10px] font-bold uppercase tracking-wider ${s.status === 'active' ? 'bg-green-150/10 text-green-700' : 'bg-red-150/10 text-red-700'}`}>
                               {s.status === 'active' ? 'Aktif' : 'Non-aktif'}
@@ -499,7 +512,7 @@ export default function SuperAdminDashboard() {
                       <td className="px-6 py-4.5 font-bold text-zinc-850">{s.name}</td>
                       <td className="px-6 py-4.5 text-zinc-650 font-semibold">{s.npsn || '-'}</td>
                       <td className="px-6 py-4.5 font-bold text-[#aa8410] uppercase">{s.level}</td>
-                      <td className="px-6 py-4.5 text-indigo-600 font-semibold">{s.subdomain}.paudku.id</td>
+                      <td className="px-6 py-4.5 text-indigo-600 font-semibold">{s.subdomain}.{getBaseDomain()}</td>
                       <td className="px-6 py-4.5 text-zinc-700 font-semibold">{s.admin_name || '-'}</td>
                       <td className="px-6 py-4.5 text-zinc-700 font-semibold">
                         {s.phone ? (
@@ -848,7 +861,7 @@ export default function SuperAdminDashboard() {
                     .map((req) => (
                       <tr key={req.id} className="hover:bg-zinc-50/30">
                         <td className="px-6 py-4 font-bold text-zinc-900">{req.school_name}</td>
-                        <td className="px-6 py-4 text-zinc-500">{req.school_subdomain}.paudku.id</td>
+                        <td className="px-6 py-4 text-zinc-500">{req.school_subdomain}.{getBaseDomain()}</td>
                         <td className="px-6 py-4 font-semibold text-indigo-650">{req.requested_domain}</td>
                         <td className="px-6 py-4">
                           <span className={`inline-flex items-center rounded-full px-2 py-0.5 text-[9px] font-bold uppercase tracking-wider ${req.billing_type === 'yearly' ? 'bg-green-50 text-green-700 border border-green-200' : 'bg-amber-50 text-amber-700 border border-amber-200'}`}>
@@ -963,7 +976,7 @@ export default function SuperAdminDashboard() {
                   <div className="grid grid-cols-3 gap-4 text-xs">
                     <div>
                       <p className="text-[10px] font-bold uppercase tracking-wider text-zinc-450">Subdomain</p>
-                      <p className="font-bold text-indigo-600 mt-0.5">{selectedSchoolDetail.school.subdomain}.paudku.id</p>
+                      <p className="font-bold text-indigo-600 mt-0.5">{selectedSchoolDetail.school.subdomain}.{getBaseDomain()}</p>
                     </div>
                     <div>
                       <p className="text-[10px] font-bold uppercase tracking-wider text-zinc-450">NPSN</p>

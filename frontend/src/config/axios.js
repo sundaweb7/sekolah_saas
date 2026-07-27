@@ -12,9 +12,15 @@ function getApiBaseUrl() {
   if (lastPart === 'localhost' || lastPart === '127' || parts.length === 1) {
     return 'http://localhost:8080/api/v1';
   }
-  // Production: strip subdomain → keep last 2 parts
-  const baseHost = parts.slice(-2).join('.');
-  return `http://${baseHost}:8080/api/v1`;
+  // Production: strip subdomain → keep last 2 parts, but support .my.id (3 parts)
+  let baseHost;
+  if (hostname.endsWith('.my.id')) {
+    baseHost = parts.slice(-3).join('.');
+  } else {
+    baseHost = parts.slice(-2).join('.');
+  }
+  const protocol = window.location.protocol;
+  return `${protocol}//${baseHost}/api/v1`;
 }
 
 const api = axios.create({

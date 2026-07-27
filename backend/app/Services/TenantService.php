@@ -40,7 +40,7 @@ class TenantService
             $subdomain = $parts[0];
             
             // Exclude common base domains
-            if ($subdomain !== 'www' && $subdomain !== 'localhost' && $subdomain !== 'paudku') {
+            if ($subdomain !== 'www' && $subdomain !== 'localhost' && $subdomain !== 'paudku' && $subdomain !== 'pusdatin') {
                 $school = $this->schoolModel->where('subdomain', $subdomain)->first();
                 if ($school && $school->status === 'active') {
                     return (int) $school->id;

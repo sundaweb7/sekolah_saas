@@ -57,7 +57,9 @@ function SubdomainRoot() {
     subdomain === '127' || 
     subdomain === 'paudku' || 
     host === 'paudku.local' || 
-    host === 'paudku.id';
+    host === 'paudku.id' ||
+    host === 'pusdatin.my.id' ||
+    host.endsWith('pusdatin.my.id.local');
 
   if (isSaasMain) {
     return <LandingPage />;
