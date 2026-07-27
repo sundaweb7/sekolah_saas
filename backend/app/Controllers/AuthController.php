@@ -236,7 +236,6 @@ class AuthController extends BaseResourceController
             'password_hash' => $password, // hashed automatically by model hook
             'role'          => 'admin',
             'full_name'     => $adminName,
-            'phone'         => $phone,
             'status'        => 'active'
         ]);
 
