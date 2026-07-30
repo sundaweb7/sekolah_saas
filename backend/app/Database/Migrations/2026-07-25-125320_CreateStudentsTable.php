@@ -42,6 +42,12 @@ class CreateStudentsTable extends Migration
                 'unsigned'   => true,
                 'null'       => true,
             ],
+            'parent_user_id' => [
+                'type' => 'BIGINT', 'constraint' => 20, 'unsigned' => true, 'null' => true,
+            ],
+            'status' => [
+                'type' => 'VARCHAR', 'constraint' => 20, 'default' => 'aktif',
+            ],
             'photo' => [
                 'type'       => 'VARCHAR',
                 'constraint' => '255',
@@ -82,6 +88,7 @@ class CreateStudentsTable extends Migration
         $this->forge->addKey('id', true);
         $this->forge->addForeignKey('school_id', 'schools', 'id', 'RESTRICT', 'CASCADE');
         $this->forge->addForeignKey('current_class_id', 'classes', 'id', 'SET NULL', 'CASCADE');
+        $this->forge->addForeignKey('parent_user_id', 'users', 'id', 'SET NULL', 'CASCADE');
         $this->forge->createTable('students');
     }
 

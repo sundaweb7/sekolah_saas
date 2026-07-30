@@ -9,8 +9,9 @@ class AddPesantrenLevel extends Migration
     public function up()
     {
         // 1. Modify schools table level column
-        $db = \Config\Database::connect();
-        $db->query("ALTER TABLE schools MODIFY COLUMN level ENUM('TK', 'SD', 'SMP', 'SMA', 'MTS_MA', 'SMK', 'PESANTREN') NOT NULL DEFAULT 'TK'");
+        $this->forge->modifyColumn('schools', [
+            'level' => ['type' => 'ENUM', 'constraint' => ['TK', 'SD', 'SMP', 'SMA', 'MTS_MA', 'SMK', 'PESANTREN'], 'default' => 'TK'],
+        ]);
 
         // 2. Add level_pesantren to feature_settings table
         $this->forge->addColumn('feature_settings', [
@@ -29,7 +30,8 @@ class AddPesantrenLevel extends Migration
         $this->forge->dropColumn('feature_settings', 'level_pesantren');
 
         // Revert level column on schools
-        $db = \Config\Database::connect();
-        $db->query("ALTER TABLE schools MODIFY COLUMN level ENUM('TK', 'SD', 'SMP', 'SMA', 'MTS_MA', 'SMK') NOT NULL DEFAULT 'TK'");
+        $this->forge->modifyColumn('schools', [
+            'level' => ['type' => 'ENUM', 'constraint' => ['TK', 'SD', 'SMP', 'SMA', 'MTS_MA', 'SMK'], 'default' => 'TK'],
+        ]);
     }
 }

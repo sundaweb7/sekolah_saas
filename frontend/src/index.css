@@ -109,68 +109,117 @@
   }
 }
 
-/* Admin Portal light theme custom overrides (putih agak kebiruan / telor asin) */
-.admin-portal-theme {
-  --color-card-light: #ffffff;
-  --color-border-light: #e2e8f0;
+/* ============================================================
+   ADMIN CONTENT AREA - Light theme overrides
+   Applies only inside the main page content area (.admin-content),
+   NOT the sidebar — so sidebar stays dark, pages stay light.
+   ============================================================ */
+
+/* Background: dark zinc → white/light
+   NOTE: bg-[#18181b] is intentionally dark (premium stats cards) — NOT overridden */
+.admin-content .bg-zinc-950,
+.admin-content .bg-zinc-900,
+.admin-content .bg-zinc-800,
+.admin-content .bg-\[\#050505\],
+.admin-content .bg-zinc-950\/50,
+.admin-content .bg-zinc-900\/50,
+.admin-content .bg-zinc-900\/30,
+.admin-content .bg-zinc-900\/20,
+.admin-content .bg-zinc-900\/40,
+.admin-content .bg-zinc-800\/10,
+.admin-content .bg-zinc-950\/30,
+.admin-content .backdrop-blur-md {
+  background-color: #ffffff !important;
+  backdrop-filter: none !important;
 }
 
-.admin-portal-theme .bg-\[\#050505\],
-.admin-portal-theme .bg-zinc-950,
-.admin-portal-theme .bg-zinc-950\/50,
-.admin-portal-theme .bg-zinc-900,
-.admin-portal-theme .bg-zinc-900\/50,
-.admin-portal-theme .bg-zinc-900\/30,
-.admin-portal-theme .bg-zinc-900\/20,
-.admin-portal-theme .bg-zinc-900\/40,
-.admin-portal-theme .bg-zinc-800\/10 {
-  background-color: var(--color-card-light) !important;
+/* Card / container borders: dark → light */
+.admin-content .border-zinc-900,
+.admin-content .border-zinc-850,
+.admin-content .border-zinc-800,
+.admin-content .border-zinc-850\/50 {
+  border-color: #e2e8f0 !important;
 }
 
-.admin-portal-theme .border-zinc-800,
-.admin-portal-theme .border-zinc-850,
-.admin-portal-theme .border-zinc-900,
-.admin-portal-theme .border-zinc-850\/50,
-.admin-portal-theme .divide-zinc-900 > * {
-  border-color: var(--color-border-light) !important;
+.admin-content .divide-zinc-900 > *,
+.admin-content .divide-zinc-800 > * {
+  border-color: #f1f5f9 !important;
 }
 
-.admin-portal-theme .text-white {
-  color: #0f172a !important; /* Zinc-900 */
-}
-.admin-portal-theme .text-zinc-300,
-.admin-portal-theme .text-zinc-350 {
-  color: #334155 !important; /* Zinc-700 */
-}
-.admin-portal-theme .text-zinc-400 {
-  color: #64748b !important; /* Zinc-500 */
-}
-.admin-portal-theme .text-zinc-500 {
-  color: #475569 !important; /* Zinc-600 */
+/* Text: white/light → readable dark */
+.admin-content .text-white {
+  color: #0f172a !important;
 }
 
-.admin-portal-theme .bg-zinc-950\/30 {
-  background-color: #f1f5f9 !important;
+/* Exception: text inside intentionally-dark containers should remain white/light-gray */
+.admin-content .bg-\[\#18181b\] .text-white,
+.admin-content .bg-zinc-950 .text-white,
+.admin-content .bg-zinc-900 .text-white,
+.admin-content .bg-zinc-950\/50 .text-white {
+  color: #ffffff !important;
 }
 
-.admin-portal-theme .fixed.bg-black\/80 {
-  background-color: rgba(15, 23, 42, 0.6) !important;
+.admin-content .bg-\[\#18181b\] .text-zinc-300,
+.admin-content .bg-\[\#18181b\] .text-zinc-400,
+.admin-content .bg-zinc-950 .text-zinc-300,
+.admin-content .bg-zinc-950 .text-zinc-400,
+.admin-content .bg-zinc-900 .text-zinc-300,
+.admin-content .bg-zinc-900 .text-zinc-400 {
+  color: #e4e4e7 !important; /* Zinc-200 */
 }
 
-.admin-portal-theme input[type="text"],
-.admin-portal-theme input[type="password"],
-.admin-portal-theme input[type="email"],
-.admin-portal-theme input[type="number"],
-.admin-portal-theme input[type="date"],
-.admin-portal-theme textarea,
-.admin-portal-theme select {
+.admin-content .text-zinc-300,
+.admin-content .text-zinc-350 {
+  color: #475569 !important;
+}
+.admin-content .text-zinc-400 {
+  color: #64748b !important;
+}
+
+/* Hover states: dark → light */
+.admin-content .hover\:bg-zinc-800:hover,
+.admin-content .hover\:bg-zinc-900:hover {
+  background-color: #f8fafc !important;
+}
+
+/* Table header dark rows */
+.admin-content thead tr {
+  background-color: #f8fafc !important;
+}
+.admin-content thead th {
+  color: #64748b !important;
+}
+
+/* Table rows */
+.admin-content tbody tr:hover {
+  background-color: #f8fafc !important;
+}
+.admin-content tbody td {
+  color: #334155 !important;
+}
+
+/* Form inputs/selects inside pages */
+.admin-content input[type="text"],
+.admin-content input[type="password"],
+.admin-content input[type="email"],
+.admin-content input[type="number"],
+.admin-content input[type="date"],
+.admin-content input[type="search"],
+.admin-content textarea,
+.admin-content select {
   background-color: #ffffff !important;
   border-color: #cbd5e1 !important;
   color: #0f172a !important;
 }
-
-.admin-portal-theme input::placeholder,
-.admin-portal-theme textarea::placeholder {
+.admin-content input::placeholder,
+.admin-content textarea::placeholder {
   color: #94a3b8 !important;
+}
+
+/* Fix page title text that's white on white */
+.admin-content h1.text-white,
+.admin-content h2.text-white,
+.admin-content h3.text-white {
+  color: #0f172a !important;
 }
 

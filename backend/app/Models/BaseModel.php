@@ -43,6 +43,12 @@ abstract class BaseModel extends Model
     {
         if ($this->isTenantScoped && defined('CURRENT_SCHOOL_ID')) {
             $this->builder()->where($this->table . '.school_id', CURRENT_SCHOOL_ID);
+
+            // Never allow request data to move an existing record into a
+            // different tenant. The signed request context is authoritative.
+            if (isset($data['data']) && is_array($data['data'])) {
+                $data['data']['school_id'] = CURRENT_SCHOOL_ID;
+            }
         }
         return $data;
     }

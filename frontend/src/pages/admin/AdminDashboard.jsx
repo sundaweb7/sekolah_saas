@@ -3,7 +3,7 @@ import { Link } from 'react-router-dom';
 import api from '../../config/axios';
 import { 
   Users, Calendar, FileText, Globe, HardDrive, 
-  CreditCard, ShieldCheck, Activity, Loader2, LogOut, AlertCircle
+  CreditCard, ShieldCheck, Activity, Loader2, LogOut, AlertCircle, CheckCircle2, Circle
 } from 'lucide-react';
 import { useAuth } from '../../context/AuthContext';
 
@@ -65,7 +65,7 @@ export default function AdminDashboard() {
     );
   }
 
-  const { counts, school, storage, activity_logs, chart_data } = data;
+  const { counts, school, storage, activity_logs, chart_data, onboarding = [] } = data;
 
   // Render SVG Column Chart for registrations
   const maxVal = Math.max(...chart_data.map(d => d.value)) || 1;
@@ -75,34 +75,64 @@ export default function AdminDashboard() {
       
       {/* Left Side: Stats and Chart */}
       <div className="lg:col-span-2 space-y-8">
+        {onboarding.some(item => !item.complete) && (
+          <section className="rounded-2xl border border-amber-200 bg-amber-50 p-5">
+            <h2 className="font-extrabold text-zinc-900">Checklist Pengaturan Awal</h2>
+            <div className="mt-3 grid gap-2 sm:grid-cols-2">
+              {onboarding.map(item => (
+                <Link key={item.label} to={item.path} className="flex items-center gap-2 text-xs font-semibold text-zinc-700 hover:text-zinc-950">
+                  {item.complete ? <CheckCircle2 className="h-4 w-4 text-green-600" /> : <Circle className="h-4 w-4 text-amber-600" />}
+                  {item.label}
+                </Link>
+              ))}
+            </div>
+          </section>
+        )}
         
         {/* Welcome Panel */}
-        <div>
-          <h1 className="text-3xl font-extrabold tracking-tight text-zinc-900">Selamat Datang, Admin</h1>
-          <p className="mt-1 text-sm text-zinc-550">Berikut adalah ikhtisar operasional dan metrik platform sekolah Anda hari ini.</p>
+        <div className="bg-[#18181b] border border-zinc-900 rounded-2xl p-6 shadow-md space-y-2 text-white">
+          <h1 className="text-xl font-extrabold tracking-tight text-[#d4af37]">Portal Manajemen {school?.name || 'Sekolah'}</h1>
+          <p className="text-xs text-zinc-300 leading-relaxed">
+            Selamat datang kembali, Admin. Sistem absensi real-time, sinkronisasi KBM pelajaran, dan manajemen data terintegrasi dalam satu dasbor premium.
+          </p>
         </div>
 
         {/* Stats Cards Grid */}
         <div className="grid grid-cols-2 sm:grid-cols-4 gap-6">
-          <Link to="/admin/students" className="rounded-xl border border-zinc-200 bg-white p-5 hover:border-zinc-350 hover:shadow-sm transition-all">
-            <Users className="h-5 w-5 text-[#aa8410] mb-3" />
-            <p className="text-2xl font-bold text-zinc-900">{counts.students}</p>
-            <p className="text-xs text-zinc-500 mt-1">Siswa Aktif</p>
+          <Link to="/admin/students" className="rounded-xl border border-zinc-900 bg-[#18181b] p-5 hover:border-[#d4af37]/30 transition-all flex flex-col">
+            <div className="h-8 w-8 rounded-lg bg-zinc-900 text-[#d4af37] flex items-center justify-center mb-3">
+              <Users className="h-4 w-4" />
+            </div>
+            <p className="text-2xl font-black text-white leading-none">{counts.students}</p>
+            <p className="text-[9px] font-bold text-[#d4af37] uppercase tracking-wider mt-2.5">Siswa Aktif</p>
+            <p className="text-[9px] text-zinc-500 mt-0.5">Terdaftar aktif</p>
           </Link>
-          <div className="rounded-xl border border-zinc-200 bg-white p-5">
-            <Users className="h-5 w-5 text-[#aa8410] mb-3" />
-            <p className="text-2xl font-bold text-zinc-900">{counts.teachers}</p>
-            <p className="text-xs text-zinc-500 mt-1">Guru Pendidik</p>
+
+          <div className="rounded-xl border border-zinc-900 bg-[#18181b] p-5 flex flex-col">
+            <div className="h-8 w-8 rounded-lg bg-zinc-900 text-[#d4af37] flex items-center justify-center mb-3">
+              <Users className="h-4 w-4" />
+            </div>
+            <p className="text-2xl font-black text-white leading-none">{counts.teachers}</p>
+            <p className="text-[9px] font-bold text-[#d4af37] uppercase tracking-wider mt-2.5">Guru Pendidik</p>
+            <p className="text-[9px] text-zinc-500 mt-0.5">Tenaga pengajar</p>
           </div>
-          <Link to="/admin/ppdb" className="rounded-xl border border-zinc-200 bg-white p-5 hover:border-zinc-350 hover:shadow-sm transition-all">
-            <Calendar className="h-5 w-5 text-[#aa8410] mb-3" />
-            <p className="text-2xl font-bold text-zinc-900">{counts.ppdb}</p>
-            <p className="text-xs text-zinc-500 mt-1">Pelamar PPDB</p>
+
+          <Link to="/admin/ppdb" className="rounded-xl border border-zinc-900 bg-[#18181b] p-5 hover:border-[#d4af37]/30 transition-all flex flex-col">
+            <div className="h-8 w-8 rounded-lg bg-zinc-900 text-[#d4af37] flex items-center justify-center mb-3">
+              <Calendar className="h-4 w-4" />
+            </div>
+            <p className="text-2xl font-black text-white leading-none">{counts.ppdb}</p>
+            <p className="text-[9px] font-bold text-[#d4af37] uppercase tracking-wider mt-2.5">Pelamar PPDB</p>
+            <p className="text-[9px] text-zinc-500 mt-0.5">Calon pendaftar</p>
           </Link>
-          <div className="rounded-xl border border-zinc-200 bg-white p-5">
-            <Globe className="h-5 w-5 text-[#aa8410] mb-3" />
-            <p className="text-2xl font-bold text-zinc-900">1.2K</p>
-            <p className="text-xs text-zinc-500 mt-1">Pengunjung Web</p>
+
+          <div className="rounded-xl border border-zinc-900 bg-[#18181b] p-5 flex flex-col">
+            <div className="h-8 w-8 rounded-lg bg-zinc-900 text-[#d4af37] flex items-center justify-center mb-3">
+              <Globe className="h-4 w-4" />
+            </div>
+            <p className="text-2xl font-black text-white leading-none">1.2K</p>
+            <p className="text-[9px] font-bold text-[#d4af37] uppercase tracking-wider mt-2.5">Pengunjung</p>
+            <p className="text-[9px] text-zinc-500 mt-0.5">Traffic website</p>
           </div>
         </div>
 

@@ -18,12 +18,16 @@ class AddCategoryIdToSchoolContents extends Migration
             ],
         ]);
         // Add foreign key constraint safely without dropping table
-        $this->db->query("ALTER TABLE school_contents ADD CONSTRAINT fk_school_contents_category_id FOREIGN KEY (category_id) REFERENCES news_categories(id) ON DELETE SET NULL ON UPDATE CASCADE;");
+        if ($this->db->DBDriver !== 'SQLite3') {
+            $this->db->query("ALTER TABLE school_contents ADD CONSTRAINT fk_school_contents_category_id FOREIGN KEY (category_id) REFERENCES news_categories(id) ON DELETE SET NULL ON UPDATE CASCADE");
+        }
     }
 
     public function down()
     {
-        $this->db->query("ALTER TABLE school_contents DROP FOREIGN KEY fk_school_contents_category_id;");
+        if ($this->db->DBDriver !== 'SQLite3') {
+            $this->db->query("ALTER TABLE school_contents DROP FOREIGN KEY fk_school_contents_category_id");
+        }
         $this->forge->dropColumn('school_contents', 'category_id');
     }
 }

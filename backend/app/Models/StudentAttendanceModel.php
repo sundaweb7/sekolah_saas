@@ -10,7 +10,8 @@ class StudentAttendanceModel extends BaseModel
     protected $returnType       = 'object';
     protected $protectFields    = true;
     protected $allowedFields    = [
-        'school_id', 'student_id', 'class_id', 'date', 'status', 'notes'
+        'school_id', 'student_id', 'class_id', 'date', 'status', 'notes',
+        'lesson_id', 'check_in_time', 'late_minutes', 'source', 'notified_at'
     ];
 
     // Dates

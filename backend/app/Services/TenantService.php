@@ -18,6 +18,20 @@ class TenantService
      */
     public function resolveTenant(string $host, string $headerId = ''): ?int
     {
+        $host = strtolower(explode(':', trim($host))[0]);
+
+        // An approved custom-domain hostname is authoritative and prevents a
+        // stale/spoofed browser header from selecting another tenant.
+        if ($host !== '') {
+            $school = $this->schoolModel
+                ->where('custom_domain', $host)
+                ->where('custom_domain_status', 'active')
+                ->first();
+            if ($school && $school->status === 'active') {
+                return (int) $school->id;
+            }
+        }
+
         // 1. If explicit header ID provided, resolve and validate it
         if (!empty($headerId)) {
             // Support both numeric ID and subdomain string in X-School-ID header
@@ -40,7 +54,7 @@ class TenantService
             $subdomain = $parts[0];
             
             // Exclude common base domains
-            if ($subdomain !== 'www' && $subdomain !== 'localhost' && $subdomain !== 'paudku' && $subdomain !== 'pusdatin') {
+            if ($subdomain !== 'www' && $subdomain !== 'localhost' && $subdomain !== 'paudku' && $subdomain !== 'koola' && $subdomain !== 'pusdatin') {
                 $school = $this->schoolModel->where('subdomain', $subdomain)->first();
                 if ($school && $school->status === 'active') {
                     return (int) $school->id;

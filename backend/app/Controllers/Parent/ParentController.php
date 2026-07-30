@@ -30,10 +30,22 @@ class ParentController extends BaseResourceController
             return $this->respondError('Unauthorized parent access', ResponseInterface::HTTP_FORBIDDEN);
         }
 
-        // Find the child associated with this parent user
-        $child = $this->studentModel->where('parent_user_id', $user->id)->first();
-        if (!$child) {
+        $children = $this->studentModel->where('parent_user_id', $user->id)->orderBy('full_name', 'ASC')->findAll();
+        if (!$children) {
             return $this->respondError('Data profil anak belum dihubungkan ke akun wali siswa Anda.', ResponseInterface::HTTP_NOT_FOUND);
+        }
+        $requestedChildId = (int) ($this->request->getGet('student_id') ?? 0);
+        $child = $children[0];
+        if ($requestedChildId) {
+            foreach ($children as $candidate) {
+                if ((int) $candidate->id === $requestedChildId) {
+                    $child = $candidate;
+                    break;
+                }
+            }
+            if ((int) $child->id !== $requestedChildId) {
+                return $this->respondError('Akses data anak ditolak.', ResponseInterface::HTTP_FORBIDDEN);
+            }
         }
 
         // Fetch SPP invoices
@@ -130,6 +142,11 @@ class ParentController extends BaseResourceController
         }
 
         return $this->respondSuccess([
+            'children' => array_map(static fn ($item) => [
+                'id' => $item->id,
+                'full_name' => $item->full_name,
+                'registration_number' => $item->registration_number,
+            ], $children),
             'child' => [
                 'id'            => $child->id,
                 'full_name'     => $child->full_name,
@@ -164,8 +181,11 @@ class ParentController extends BaseResourceController
         }
 
         // Verify that this invoice belongs to the parent's child
-        $child = $this->studentModel->where('parent_user_id', $user->id)->first();
-        if (!$child || $invoice->student_id != $child->id) {
+        $child = $this->studentModel
+            ->where('id', $invoice->student_id)
+            ->where('parent_user_id', $user->id)
+            ->first();
+        if (!$child) {
             return $this->respondError('Akses tagihan ditolak.', ResponseInterface::HTTP_FORBIDDEN);
         }
 
@@ -204,7 +224,8 @@ class ParentController extends BaseResourceController
             ], 'Instruksi pembayaran berhasil dibuat.');
 
         } catch (Exception $e) {
-            return $this->respondError('Gagal membuat transaksi Tripay: ' . $e->getMessage(), ResponseInterface::HTTP_BAD_REQUEST);
+            log_message('error', 'SPP checkout failed: {message}', ['message' => $e->getMessage()]);
+            return $this->respondError('Penyedia pembayaran sedang tidak tersedia.', ResponseInterface::HTTP_SERVICE_UNAVAILABLE);
         }
     }
 }

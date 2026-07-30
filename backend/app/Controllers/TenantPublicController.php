@@ -157,4 +157,27 @@ class TenantPublicController extends BaseResourceController
 
         return $this->respondSuccess($news, 'News detail loaded successfully');
     }
+
+    /**
+     * GET /api/v1/tenant/page/detail/{slug}
+     */
+    public function getPageDetail(string $slug): ResponseInterface
+    {
+        if (!defined('CURRENT_SCHOOL_ID')) {
+            return $this->respondError('School context not resolved.', ResponseInterface::HTTP_NOT_FOUND);
+        }
+
+        $contentModel = new SchoolContentModel();
+        $page = $contentModel->where('school_id', CURRENT_SCHOOL_ID)
+                             ->where('type', 'page')
+                             ->where('status', 'published')
+                             ->where('slug', $slug)
+                             ->first();
+
+        if (!$page) {
+            return $this->respondError('Halaman kustom tidak ditemukan.', ResponseInterface::HTTP_NOT_FOUND);
+        }
+
+        return $this->respondSuccess($page, 'Halaman kustom berhasil dimuat.');
+    }
 }

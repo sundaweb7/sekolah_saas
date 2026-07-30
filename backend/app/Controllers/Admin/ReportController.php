@@ -8,6 +8,9 @@ use App\Models\SemesterReportModel;
 use App\Models\TeacherAttendanceModel;
 use App\Models\ClassJournalModel;
 use App\Models\StudentAttendanceModel;
+use App\Models\StudentModel;
+use App\Models\TeacherModel;
+use App\Models\ClassModel;
 use App\Libraries\UploadService;
 use CodeIgniter\HTTP\ResponseInterface;
 use Exception;
@@ -34,6 +37,9 @@ class ReportController extends BaseResourceController
         if (!$studentId) {
             return $this->respondError('ID Siswa diperlukan.', ResponseInterface::HTTP_BAD_REQUEST);
         }
+        if (!(new StudentModel())->find($studentId)) {
+            return $this->respondError('Siswa tidak ditemukan.', ResponseInterface::HTTP_NOT_FOUND);
+        }
 
         $reports = $this->dailyModel->where('student_id', $studentId)->orderBy('date', 'DESC')->findAll();
         return $this->respondSuccess($reports);
@@ -57,10 +63,12 @@ class ReportController extends BaseResourceController
         }
 
         $data['school_id'] = defined('CURRENT_SCHOOL_ID') ? CURRENT_SCHOOL_ID : null;
-        $user = $this->request->user ?? null;
-        if ($user) {
-            $data['teacher_id'] = $user->id;
+        $student = (new StudentModel())->find($data['student_id'] ?? null);
+        if (!$student) {
+            return $this->respondError('Siswa tidak ditemukan.', ResponseInterface::HTTP_NOT_FOUND);
         }
+        $data['teacher_id'] = $this->resolveTeacherId($student);
+        if (!$data['teacher_id']) return $this->respondError('Profil guru untuk laporan tidak ditemukan.', ResponseInterface::HTTP_BAD_REQUEST);
 
         if (!$this->dailyModel->insert($data)) {
             return $this->respondError('Gagal menyimpan laporan harian.', ResponseInterface::HTTP_BAD_REQUEST, $this->dailyModel->errors());
@@ -81,6 +89,9 @@ class ReportController extends BaseResourceController
         }
 
         $data = $this->request->getPost();
+        if (isset($data['student_id']) && !(new StudentModel())->find($data['student_id'])) {
+            return $this->respondError('Siswa tidak ditemukan.', ResponseInterface::HTTP_NOT_FOUND);
+        }
 
         $file = $this->request->getFile('photo_file');
         if ($file && $file->isValid()) {
@@ -129,6 +140,9 @@ class ReportController extends BaseResourceController
         if (!$studentId) {
             return $this->respondError('ID Siswa diperlukan.', ResponseInterface::HTTP_BAD_REQUEST);
         }
+        if (!(new StudentModel())->find($studentId)) {
+            return $this->respondError('Siswa tidak ditemukan.', ResponseInterface::HTTP_NOT_FOUND);
+        }
 
         $reports = $this->semesterModel->where('student_id', $studentId)->orderBy('id', 'DESC')->findAll();
         return $this->respondSuccess($reports);
@@ -141,10 +155,12 @@ class ReportController extends BaseResourceController
     {
         $data = $this->request->getPost();
         $data['school_id'] = defined('CURRENT_SCHOOL_ID') ? CURRENT_SCHOOL_ID : null;
-        $user = $this->request->user ?? null;
-        if ($user) {
-            $data['teacher_id'] = $user->id;
+        $student = (new StudentModel())->find($data['student_id'] ?? null);
+        if (!$student) {
+            return $this->respondError('Siswa tidak ditemukan.', ResponseInterface::HTTP_NOT_FOUND);
         }
+        $data['teacher_id'] = $this->resolveTeacherId($student);
+        if (!$data['teacher_id']) return $this->respondError('Profil guru untuk laporan tidak ditemukan.', ResponseInterface::HTTP_BAD_REQUEST);
 
         if (!$this->semesterModel->insert($data)) {
             return $this->respondError('Gagal menyimpan rapor semester.', ResponseInterface::HTTP_BAD_REQUEST, $this->semesterModel->errors());
@@ -261,5 +277,19 @@ class ReportController extends BaseResourceController
                          ->findAll();
                          
         return $this->respondSuccess($reports);
+    }
+
+    private function resolveTeacherId(object $student): ?int
+    {
+        $user = $this->request->user ?? null;
+        if (($user->role ?? null) === 'teacher') {
+            $teacher = (new TeacherModel())->where('user_id', $user->id)->first();
+            return $teacher ? (int) $teacher->id : null;
+        }
+        if ($student->current_class_id) {
+            $class = (new ClassModel())->find($student->current_class_id);
+            return $class && $class->teacher_id ? (int) $class->teacher_id : null;
+        }
+        return null;
     }
 }

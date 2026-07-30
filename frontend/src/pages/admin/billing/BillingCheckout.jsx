@@ -16,6 +16,7 @@ export default function BillingCheckout() {
   const [submitting, setSubmitting] = useState(false);
   const [checkoutResult, setCheckoutResult] = useState(null);
   const [error, setError] = useState(null);
+  const [copied, setCopied] = useState(false);
 
   const plans = {
     basic: { 
@@ -67,52 +68,73 @@ export default function BillingCheckout() {
 
         {checkoutResult ? (
           /* Payment Instructions Card (Success state) */
-          <div className="rounded-2xl border border-zinc-800 bg-zinc-900/40 p-8 space-y-6 shadow-2xl backdrop-blur-md">
-            <div className="text-center space-y-2">
-              <div className="mx-auto flex h-12 w-12 items-center justify-center rounded-full bg-green-500/10 text-green-400">
-                <CheckCircle2 className="h-6 w-6" />
+            <div className="rounded-2xl border border-zinc-200 bg-white p-8 space-y-6 shadow-2xl text-zinc-800">
+              <div className="text-center space-y-2">
+                <div className="mx-auto flex h-12 w-12 items-center justify-center rounded-full bg-emerald-500/10 text-emerald-600">
+                  <CheckCircle2 className="h-6 w-6" />
+                </div>
+                <h2 className="text-xl font-black text-zinc-900">Invoice Berhasil Dibuat</h2>
+                <p className="text-xs text-zinc-600 font-medium">Selesaikan pembayaran sesuai instruksi di bawah ini</p>
               </div>
-              <h2 className="text-xl font-bold text-white">Invoice Berhasil Dibuat</h2>
-              <p className="text-xs text-zinc-500">Selesaikan pembayaran sesuai instruksi di bawah ini</p>
-            </div>
 
-            <div className="rounded-xl bg-zinc-950 p-5 border border-zinc-850 space-y-3 text-sm">
-              <div className="flex justify-between">
-                <span className="text-zinc-500">Nomor Invoice:</span>
-                <span className="font-mono text-white font-bold">{checkoutResult.invoice.invoice_number}</span>
-              </div>
-              <div className="flex justify-between">
-                <span className="text-zinc-500">Metode Pembayaran:</span>
-                <span className="text-white font-bold">{checkoutResult.tripay.payment_name}</span>
-              </div>
-              <div className="flex justify-between border-t border-zinc-850 pt-2.5">
-                <span className="text-zinc-500">Total Nominal:</span>
-                <span className="text-indigo-400 font-bold text-lg">
-                  Rp {parseFloat(checkoutResult.tripay.amount).toLocaleString('id-ID')}
-                </span>
-              </div>
-            </div>
-
-            {/* Payment Steps */}
-            <div className="space-y-4">
-              <h3 className="font-semibold text-white text-sm">Instruksi Pembayaran:</h3>
-              <div className="space-y-3">
-                {checkoutResult.tripay.instructions[0].steps.map((step, idx) => (
-                  <div key={idx} className="flex gap-3 text-xs text-zinc-300">
-                    <span className="flex h-5 w-5 items-center justify-center rounded-full bg-zinc-800 text-[10px] font-bold text-zinc-400 shrink-0">
-                      {idx + 1}
-                    </span>
-                    <p className="leading-relaxed mt-0.5">{step}</p>
+              <div className="rounded-xl bg-zinc-50 p-5 border border-zinc-200 space-y-3 text-sm">
+                <div className="flex justify-between">
+                  <span className="text-zinc-600 font-bold">Nomor Invoice:</span>
+                  <span className="font-mono text-zinc-950 font-black">{checkoutResult.invoice.invoice_number}</span>
+                </div>
+                <div className="flex justify-between">
+                  <span className="text-zinc-600 font-bold">Metode Pembayaran:</span>
+                  <span className="text-zinc-950 font-black">{checkoutResult.tripay.payment_name}</span>
+                </div>
+                {checkoutResult.tripay.pay_code && (
+                  <div className="flex justify-between items-center border-t border-zinc-200 pt-2.5">
+                    <span className="text-zinc-600 font-bold">Kode Bayar / VA:</span>
+                    <div className="flex items-center gap-2">
+                      <span className="font-mono text-amber-600 font-black text-xl tracking-wider select-all">
+                        {checkoutResult.tripay.pay_code}
+                      </span>
+                      <button
+                        type="button"
+                        onClick={() => {
+                          navigator.clipboard.writeText(checkoutResult.tripay.pay_code);
+                          setCopied(true);
+                          setTimeout(() => setCopied(false), 2000);
+                        }}
+                        className="rounded bg-zinc-100 hover:bg-zinc-200 px-2 py-0.5 text-[10px] font-bold text-zinc-700 transition-all border border-zinc-300 active:scale-95"
+                      >
+                        {copied ? 'Tersalin' : 'Salin'}
+                      </button>
+                    </div>
                   </div>
-                ))}
+                )}
+                <div className="flex justify-between border-t border-zinc-200 pt-2.5">
+                  <span className="text-zinc-600 font-bold">Total Nominal:</span>
+                  <span className="text-indigo-600 font-black text-lg">
+                    Rp {parseFloat(checkoutResult.tripay.amount).toLocaleString('id-ID')}
+                  </span>
+                </div>
               </div>
-            </div>
 
-            <div className="pt-4">
-              <a 
-                href={checkoutResult.tripay.checkout_url}
-                target="_blank"
-                rel="noreferrer"
+              {/* Payment Steps */}
+              <div className="space-y-4">
+                <h3 className="font-black text-zinc-900 text-sm">Instruksi Pembayaran:</h3>
+                <div className="space-y-3">
+                  {checkoutResult.tripay.instructions[0].steps.map((step, idx) => (
+                    <div key={idx} className="flex gap-3 text-xs text-zinc-800 font-semibold">
+                      <span className="flex h-5 w-5 items-center justify-center rounded-full bg-zinc-200 text-[10px] font-black text-zinc-700 shrink-0">
+                        {idx + 1}
+                      </span>
+                      <p className="leading-relaxed mt-0.5 text-zinc-700" dangerouslySetInnerHTML={{ __html: step }} />
+                    </div>
+                  ))}
+                </div>
+              </div>
+
+              <div className="pt-4">
+                <a 
+                  href={checkoutResult.tripay.checkout_url}
+                  target="_blank"
+                  rel="noreferrer"
                 className="flex w-full items-center justify-center rounded-lg bg-indigo-600 py-3 text-sm font-semibold text-white shadow-lg hover:bg-indigo-500 transition-all"
               >
                 Bayar via Tripay Portal ↗

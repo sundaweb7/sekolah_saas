@@ -46,6 +46,11 @@ class AuthController extends BaseResourceController
         if (!$user || !password_verify($password, $user->password_hash)) {
             return $this->respondError('Invalid email or password', ResponseInterface::HTTP_UNAUTHORIZED);
         }
+        if (($user->role === 'superadmin' && $user->school_id !== null)
+            || ($user->role !== 'superadmin' && $user->school_id === null)) {
+            log_message('critical', 'Rejected invalid role/tenant binding for user ID {id}', ['id' => $user->id]);
+            return $this->respondError('Account configuration is invalid', ResponseInterface::HTTP_FORBIDDEN);
+        }
 
         $schoolLevel = 'TK';
         $allowedFeatures = [];
@@ -91,7 +96,7 @@ class AuthController extends BaseResourceController
             'id'               => $user->id,
             'school_id'        => $user->school_id,
             'school_level'     => $schoolLevel,
-            'allowed_features' => $allowedFeatures,
+            'allowed_features' => (new \App\Services\FeatureAccessService())->forSchool($user->school_id ? (int) $user->school_id : null),
             'email'            => $user->email,
             'role'             => $user->role,
             'full_name'        => $user->full_name
@@ -110,7 +115,7 @@ class AuthController extends BaseResourceController
         $refreshTokenModel->save([
             'school_id'  => $user->school_id,
             'user_id'    => $user->id,
-            'token'      => $refreshTokenString,
+            'token'      => hash('sha256', $refreshTokenString),
             'expires_at' => $expiresAt
         ]);
 
@@ -124,7 +129,7 @@ class AuthController extends BaseResourceController
                 'full_name'        => $user->full_name,
                 'school_id'        => $user->school_id,
                 'school_level'     => $schoolLevel,
-                'allowed_features' => $allowedFeatures
+                'allowed_features' => (new \App\Services\FeatureAccessService())->forSchool($user->school_id ? (int) $user->school_id : null)
             ]
         ], 'Login successful');
     }
@@ -141,7 +146,7 @@ class AuthController extends BaseResourceController
         }
 
         $refreshTokenModel = new RefreshTokenModel();
-        $tokenRecord = $refreshTokenModel->where('token', $refreshTokenString)->first();
+        $tokenRecord = $refreshTokenModel->where('token', hash('sha256', $refreshTokenString))->first();
 
         if (!$tokenRecord || strtotime($tokenRecord->expires_at) < time()) {
             return $this->respondError('Invalid or expired refresh token', ResponseInterface::HTTP_UNAUTHORIZED);
@@ -150,8 +155,24 @@ class AuthController extends BaseResourceController
         $userModel = new UserModel();
         $user = $userModel->find($tokenRecord->user_id);
 
-        if (!$user || $user->status !== 'active') {
+        if (!$user || $user->status !== 'active'
+            || (int) ($user->school_id ?? 0) !== (int) ($tokenRecord->school_id ?? 0)
+            || ($user->role === 'superadmin' && $user->school_id !== null)
+            || ($user->role !== 'superadmin' && $user->school_id === null)) {
             return $this->respondError('User not active', ResponseInterface::HTTP_UNAUTHORIZED);
+        }
+
+        // Block token refresh if the original token was an impersonation session
+        $authHeader = $this->request->getServer('HTTP_AUTHORIZATION') ?? $this->request->getHeaderLine('Authorization');
+        if (!empty($authHeader)) {
+            $arr = explode(" ", $authHeader);
+            $accessTokenString = count($arr) > 1 ? $arr[1] : null;
+            if ($accessTokenString) {
+                $decoded = $this->jwtService->decodeToken($accessTokenString);
+                if ($decoded && !empty($decoded->is_impersonating)) {
+                    return $this->respondError('Session refresh is not allowed for impersonation sessions', ResponseInterface::HTTP_UNAUTHORIZED);
+                }
+            }
         }
 
         // Generate new Access Token
@@ -162,10 +183,19 @@ class AuthController extends BaseResourceController
             'role'      => $user->role,
             'full_name' => $user->full_name
         ];
+        $payload['allowed_features'] = (new \App\Services\FeatureAccessService())->forSchool($user->school_id ? (int) $user->school_id : null);
         $newAccessToken = $this->jwtService->generateToken($payload);
+
+        $newRefreshToken = bin2hex(random_bytes(32));
+        $refreshExpire = (int) env('JWT_REFRESH_EXPIRE', 2592000);
+        $refreshTokenModel->update($tokenRecord->id, [
+            'token' => hash('sha256', $newRefreshToken),
+            'expires_at' => date('Y-m-d H:i:s', time() + $refreshExpire),
+        ]);
 
         return $this->respondSuccess([
             'access_token' => $newAccessToken,
+            'refresh_token' => $newRefreshToken,
         ], 'Token refreshed successfully');
     }
 
@@ -178,10 +208,60 @@ class AuthController extends BaseResourceController
 
         if (!empty($refreshTokenString)) {
             $refreshTokenModel = new RefreshTokenModel();
-            $refreshTokenModel->where('token', $refreshTokenString)->delete();
+            $refreshTokenModel->where('token', hash('sha256', $refreshTokenString))->delete();
         }
 
         return $this->respondSuccess(null, 'Logged out successfully');
+    }
+
+    /** Exchange a short-lived, single-use impersonation code on the target tenant. */
+    public function exchangeImpersonation(): ResponseInterface
+    {
+        $code = (string) ($this->getRequestBody()['code'] ?? '');
+        if (strlen($code) !== 64 || !ctype_xdigit($code) || !defined('CURRENT_SCHOOL_ID')) {
+            return $this->respondError('Invalid or expired impersonation code', ResponseInterface::HTTP_UNAUTHORIZED);
+        }
+
+        $model = new \App\Models\ImpersonationTokenModel();
+        $record = $model->where('token_hash', hash('sha256', $code))->first();
+        if (!$record || (int) $record->school_id !== (int) CURRENT_SCHOOL_ID || strtotime($record->expires_at) < time()) {
+            return $this->respondError('Invalid or expired impersonation code', ResponseInterface::HTTP_UNAUTHORIZED);
+        }
+
+        $db = \Config\Database::connect();
+        $db->transStart();
+        $model->where('id', $record->id)->where('token_hash', hash('sha256', $code))->delete();
+        if ($db->affectedRows() !== 1) {
+            $db->transRollback();
+            return $this->respondError('Invalid or expired impersonation code', ResponseInterface::HTTP_UNAUTHORIZED);
+        }
+        $user = (new UserModel())->find($record->user_id);
+        if (!$user || $user->status !== 'active' || (int) $user->school_id !== (int) CURRENT_SCHOOL_ID || $user->role === 'superadmin') {
+            $db->transRollback();
+            return $this->respondError('Impersonation target is unavailable', ResponseInterface::HTTP_UNAUTHORIZED);
+        }
+
+        $features = (new \App\Services\FeatureAccessService())->forSchool((int) $user->school_id);
+        $accessToken = $this->jwtService->generateToken([
+            'id' => $user->id, 'school_id' => $user->school_id, 'email' => $user->email,
+            'role' => $user->role, 'full_name' => $user->full_name, 'allowed_features' => $features,
+            'is_impersonating' => true,
+        ], 300); // 5 minutes expiration
+        $refreshToken = bin2hex(random_bytes(32));
+        (new RefreshTokenModel())->insert([
+            'school_id' => $user->school_id, 'user_id' => $user->id,
+            'token' => hash('sha256', $refreshToken), 'expires_at' => date('Y-m-d H:i:s', time() + 300), // expire refresh token in 5 mins too
+        ]);
+        $db->transComplete();
+        if (!$db->transStatus()) {
+            return $this->respondError('Unable to create impersonation session', ResponseInterface::HTTP_INTERNAL_SERVER_ERROR);
+        }
+
+        return $this->respondSuccess([
+            'access_token' => $accessToken, 'refresh_token' => $refreshToken,
+            'user' => ['id' => $user->id, 'email' => $user->email, 'role' => $user->role,
+                'full_name' => $user->full_name, 'school_id' => $user->school_id, 'allowed_features' => $features],
+        ], 'Impersonation session created');
     }
 
     /**
@@ -201,6 +281,13 @@ class AuthController extends BaseResourceController
 
         if (empty($schoolName) || empty($subdomain) || empty($adminName) || empty($email) || empty($password) || empty($phone) || empty($npsn)) {
             return $this->respondError('All fields are required', ResponseInterface::HTTP_BAD_REQUEST);
+        }
+
+        $subdomain = strtolower(trim($subdomain));
+        if (!filter_var($email, FILTER_VALIDATE_EMAIL)
+            || strlen($password) < 8
+            || !preg_match('/^[a-z0-9](?:[a-z0-9-]{0,61}[a-z0-9])?$/', $subdomain)) {
+            return $this->respondError('Email, password, atau subdomain tidak valid', ResponseInterface::HTTP_BAD_REQUEST);
         }
 
         if (!in_array($level, ['TK', 'SD', 'SMP', 'SMA', 'MTS_MA', 'SMK', 'PESANTREN'])) {
@@ -285,14 +372,28 @@ class AuthController extends BaseResourceController
         $passwordResetModel->save([
             'school_id'  => $schoolId,
             'email'      => $email,
-            'token'      => $token,
+            'token'      => hash('sha256', $token),
             'expires_at' => $expiresAt
         ]);
 
+        if (ENVIRONMENT === 'production') {
+            $frontendUrl = rtrim((string) env('FRONTEND_BASE_URL', base_url()), '/');
+            $resetUrl = $frontendUrl . '/reset-password?token=' . rawurlencode($token);
+            $emailService = \Config\Services::email();
+            $emailService->setTo($user->email);
+            $emailService->setSubject('Reset Password PAUDKU / Koola');
+            $emailService->setMessage(
+                '<p>Gunakan tautan berikut untuk mengatur ulang password. Tautan berlaku selama satu jam.</p>'
+                . '<p><a href="' . esc($resetUrl) . '">Reset password</a></p>'
+            );
+            if (!$emailService->send()) {
+                log_message('error', 'Password reset email could not be sent for user ID {id}', ['id' => $user->id]);
+            }
+        }
+
         // In a real application, email/sms is sent. For local API testing, we return the token in JSON.
-        return $this->respondSuccess([
-            'reset_token' => $token
-        ], 'Password reset token generated (simulated send)');
+        $responseData = ENVIRONMENT === 'production' ? null : ['reset_token' => $token];
+        return $this->respondSuccess($responseData, 'If the email exists, a reset link will be sent.');
     }
 
     /**
@@ -306,11 +407,14 @@ class AuthController extends BaseResourceController
         if (empty($token) || empty($password)) {
             return $this->respondError('Token and Password are required', ResponseInterface::HTTP_BAD_REQUEST);
         }
+        if (strlen($password) < 8) {
+            return $this->respondError('Password must contain at least 8 characters', ResponseInterface::HTTP_BAD_REQUEST);
+        }
 
         $schoolId = defined('CURRENT_SCHOOL_ID') ? CURRENT_SCHOOL_ID : null;
 
         $passwordResetModel = new PasswordResetModel();
-        $resetRecord = $passwordResetModel->where('token', $token)
+        $resetRecord = $passwordResetModel->where('token', hash('sha256', $token))
                                            ->where('school_id', $schoolId)
                                            ->first();
 
@@ -401,7 +505,7 @@ class AuthController extends BaseResourceController
             'id'               => $user->id,
             'school_id'        => $user->school_id,
             'school_level'     => $schoolLevel,
-            'allowed_features' => $allowedFeatures,
+            'allowed_features' => (new \App\Services\FeatureAccessService())->forSchool($user->school_id ? (int) $user->school_id : null),
             'email'            => $user->email,
             'role'             => $user->role,
             'full_name'        => $user->full_name,
@@ -425,6 +529,9 @@ class AuthController extends BaseResourceController
 
         if (empty($oldPassword) || empty($newPassword)) {
             return $this->respondError('Old password and new password are required', ResponseInterface::HTTP_BAD_REQUEST);
+        }
+        if (strlen($newPassword) < 8) {
+            return $this->respondError('New password must contain at least 8 characters', ResponseInterface::HTTP_BAD_REQUEST);
         }
 
         $userModel = new UserModel();

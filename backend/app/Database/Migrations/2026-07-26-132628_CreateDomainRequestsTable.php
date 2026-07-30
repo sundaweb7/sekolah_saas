@@ -55,6 +55,9 @@ class CreateDomainRequestsTable extends Migration
                 'type' => 'DATETIME',
                 'null' => true,
             ],
+            'created_by' => ['type' => 'BIGINT', 'constraint' => 20, 'unsigned' => true, 'null' => true],
+            'updated_by' => ['type' => 'BIGINT', 'constraint' => 20, 'unsigned' => true, 'null' => true],
+            'deleted_by' => ['type' => 'BIGINT', 'constraint' => 20, 'unsigned' => true, 'null' => true],
         ]);
 
         $this->forge->addKey('id', true);

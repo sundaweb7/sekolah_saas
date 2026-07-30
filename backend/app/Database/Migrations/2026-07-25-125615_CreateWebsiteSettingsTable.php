@@ -30,11 +30,13 @@ class CreateWebsiteSettingsTable extends Migration
                 'constraint' => '255',
                 'null'       => true,
             ],
+            'letterhead_logo' => ['type' => 'VARCHAR', 'constraint' => 255, 'null' => true],
             'theme_color' => [
                 'type'       => 'VARCHAR',
                 'constraint' => '10',
                 'default'    => '#6366F1', // default Indigo color
             ],
+            'theme_template' => ['type' => 'VARCHAR', 'constraint' => 50, 'default' => 'modern'],
             'menu_data' => [
                 'type' => 'JSON',
                 'null' => true,
@@ -52,6 +54,11 @@ class CreateWebsiteSettingsTable extends Migration
                 'type' => 'JSON',
                 'null' => true,
             ],
+            'payment_bank_name' => ['type' => 'VARCHAR', 'constraint' => 100, 'null' => true],
+            'payment_account_number' => ['type' => 'VARCHAR', 'constraint' => 100, 'null' => true],
+            'payment_account_name' => ['type' => 'VARCHAR', 'constraint' => 150, 'null' => true],
+            'bank_accounts' => ['type' => 'JSON', 'null' => true],
+            'show_accreditation' => ['type' => 'TINYINT', 'constraint' => 1, 'default' => 0],
             'hero_banner_image' => [
                 'type'       => 'VARCHAR',
                 'constraint' => '255',

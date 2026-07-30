@@ -8,6 +8,7 @@ use App\Libraries\UploadService;
 use PhpOffice\PhpSpreadsheet\Spreadsheet;
 use PhpOffice\PhpSpreadsheet\Writer\Xlsx;
 use PhpOffice\PhpSpreadsheet\IOFactory;
+use PhpOffice\PhpSpreadsheet\Cell\DataType;
 use CodeIgniter\HTTP\ResponseInterface;
 use Exception;
 
@@ -73,6 +74,29 @@ class StudentController extends BaseResourceController
     }
 
     /**
+     * GET /api/v1/admin/students/stats
+     */
+    public function stats(): ResponseInterface
+    {
+        $schoolId = defined('CURRENT_SCHOOL_ID') ? CURRENT_SCHOOL_ID : null;
+        if (!$schoolId) {
+            return $this->respondError('School context required', ResponseInterface::HTTP_BAD_REQUEST);
+        }
+
+        $totalActive = $this->studentModel->where('school_id', $schoolId)->where('status', 'aktif')->countAllResults();
+        $totalMale = $this->studentModel->where('school_id', $schoolId)->where('status', 'aktif')->where('gender', 'L')->countAllResults();
+        $totalFemale = $this->studentModel->where('school_id', $schoolId)->where('status', 'aktif')->where('gender', 'P')->countAllResults();
+        $totalMutation = $this->studentModel->where('school_id', $schoolId)->where('status', 'mutasi')->countAllResults();
+
+        return $this->respondSuccess([
+            'total_active' => $totalActive,
+            'total_male' => $totalMale,
+            'total_female' => $totalFemale,
+            'total_mutation' => $totalMutation
+        ]);
+    }
+
+    /**
      * GET /api/v1/admin/students/show/{id}
      */
     public function show($id = null): ResponseInterface
@@ -100,6 +124,9 @@ class StudentController extends BaseResourceController
      */
     public function create(): ResponseInterface
     {
+        if (!$this->hasStudentCapacity(1)) {
+            return $this->respondError('Kuota siswa paket telah tercapai.', ResponseInterface::HTTP_FORBIDDEN);
+        }
         $data = $this->request->getPost();
         
         // Handle Photo Upload
@@ -128,13 +155,16 @@ class StudentController extends BaseResourceController
                 $data['parent_user_id'] = $existingUser->id;
             } else {
                 $parentName = $this->request->getPost('parent_name') ?: 'Wali dari ' . $data['full_name'];
-                $parentPassword = $this->request->getPost('parent_password') ?: 'password123';
+                $parentPassword = $this->request->getPost('parent_password');
+                if (!$parentPassword || strlen($parentPassword) < 8) {
+                    return $this->respondError('Password wali minimal 8 karakter.', ResponseInterface::HTTP_BAD_REQUEST);
+                }
                 $parentPhone = $this->request->getPost('parent_phone') ?: '';
                 
                 $newUserId = $userModel->insert([
                     'school_id' => defined('CURRENT_SCHOOL_ID') ? CURRENT_SCHOOL_ID : null,
                     'email' => $parentEmail,
-                    'password_hash' => password_hash($parentPassword, PASSWORD_BCRYPT),
+                    'password_hash' => $parentPassword,
                     'role' => 'parent',
                     'full_name' => $parentName,
                     'phone' => $parentPhone,
@@ -203,20 +233,28 @@ class StudentController extends BaseResourceController
                 $updateData = [];
                 if ($this->request->getPost('parent_name')) $updateData['full_name'] = $this->request->getPost('parent_name');
                 if ($this->request->getPost('parent_phone')) $updateData['phone'] = $this->request->getPost('parent_phone');
-                if ($this->request->getPost('parent_password')) $updateData['password_hash'] = password_hash($this->request->getPost('parent_password'), PASSWORD_BCRYPT);
+                if ($this->request->getPost('parent_password')) {
+                    if (strlen($this->request->getPost('parent_password')) < 8) {
+                        return $this->respondError('Password wali minimal 8 karakter.', ResponseInterface::HTTP_BAD_REQUEST);
+                    }
+                    $updateData['password_hash'] = $this->request->getPost('parent_password');
+                }
                 
                 if (!empty($updateData)) {
                     $userModel->update($existingUser->id, $updateData);
                 }
             } else {
                 $parentName = $this->request->getPost('parent_name') ?: 'Wali dari ' . ($data['full_name'] ?? $student->full_name);
-                $parentPassword = $this->request->getPost('parent_password') ?: 'password123';
+                $parentPassword = $this->request->getPost('parent_password');
+                if (!$parentPassword || strlen($parentPassword) < 8) {
+                    return $this->respondError('Password wali minimal 8 karakter.', ResponseInterface::HTTP_BAD_REQUEST);
+                }
                 $parentPhone = $this->request->getPost('parent_phone') ?: '';
                 
                 $newUserId = $userModel->insert([
                     'school_id' => defined('CURRENT_SCHOOL_ID') ? CURRENT_SCHOOL_ID : null,
                     'email' => $parentEmail,
-                    'password_hash' => password_hash($parentPassword, PASSWORD_BCRYPT),
+                    'password_hash' => $parentPassword,
                     'role' => 'parent',
                     'full_name' => $parentName,
                     'phone' => $parentPhone,
@@ -275,8 +313,8 @@ class StudentController extends BaseResourceController
 
         $row = 2;
         foreach ($students as $student) {
-            $sheet->setCellValue('A' . $row, $student->registration_number);
-            $sheet->setCellValue('B' . $row, $student->full_name);
+            $sheet->setCellValueExplicit('A' . $row, (string) $student->registration_number, DataType::TYPE_STRING);
+            $sheet->setCellValueExplicit('B' . $row, (string) $student->full_name, DataType::TYPE_STRING);
             $sheet->setCellValue('C' . $row, $student->birth_date);
             $sheet->setCellValue('D' . $row, $student->gender);
             $row++;
@@ -305,15 +343,33 @@ class StudentController extends BaseResourceController
         if (!$file || !$file->isValid()) {
             return $this->respondError('Invalid file upload', ResponseInterface::HTTP_BAD_REQUEST);
         }
+        if ($file->getSizeByUnit('kb') > 2048 || !in_array($file->getMimeType(), [
+            'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet',
+            'application/vnd.ms-excel',
+            'text/csv',
+            'text/plain',
+        ], true)) {
+            return $this->respondError('File harus XLSX/CSV dan maksimal 2 MB.', ResponseInterface::HTTP_BAD_REQUEST);
+        }
 
         try {
             $spreadsheet = IOFactory::load($file->getTempName());
             $worksheet = $spreadsheet->getActiveSheet();
             $rows = $worksheet->toArray();
+            if (count($rows) > 5001) {
+                return $this->respondError('Import dibatasi maksimal 5.000 siswa.', ResponseInterface::HTTP_BAD_REQUEST);
+            }
+            $nonEmptyRows = count(array_filter(array_slice($rows, 1), static fn ($row) => !empty($row[1])));
+            if (!$this->hasStudentCapacity($nonEmptyRows)) {
+                return $this->respondError('Import melebihi kuota siswa paket.', ResponseInterface::HTTP_FORBIDDEN);
+            }
             
             $inserted = 0;
             $userPayload = $this->request->user ?? null;
             
+            $db = \Config\Database::connect();
+            $db->transStart();
+
             // Loop starting from row 2 (skip header)
             for ($i = 1; $i < count($rows); $i++) {
                 if (empty($rows[$i][1])) continue; // Skip if Name is empty
@@ -328,9 +384,15 @@ class StudentController extends BaseResourceController
                 $inserted++;
             }
 
+            $db->transComplete();
+            if ($db->transStatus() === false) {
+                return $this->respondError('Import gagal dan tidak ada data yang disimpan.', ResponseInterface::HTTP_BAD_REQUEST);
+            }
+
             return $this->respondSuccess(['imported_rows' => $inserted], 'Data imported successfully');
         } catch (Exception $e) {
-            return $this->respondError($e->getMessage(), ResponseInterface::HTTP_INTERNAL_SERVER_ERROR);
+            log_message('error', 'Student import failed: {message}', ['message' => $e->getMessage()]);
+            return $this->respondError('File tidak dapat diproses.', ResponseInterface::HTTP_BAD_REQUEST);
         }
     }
 
@@ -361,42 +423,21 @@ class StudentController extends BaseResourceController
             return $this->respondError('Akun wali siswa tidak aktif atau tidak ditemukan.', ResponseInterface::HTTP_NOT_FOUND);
         }
 
-        $jwtService = new \App\Libraries\JWTService();
-
-        $payload = [
-            'id'        => $parentUser->id,
-            'school_id' => $parentUser->school_id,
-            'email'     => $parentUser->email,
-            'role'      => $parentUser->role,
-            'full_name' => $parentUser->full_name,
-        ];
-
-        $accessToken       = $jwtService->generateToken($payload);
-        $refreshTokenString = bin2hex(random_bytes(32));
-
-        $refreshTokenModel = new \App\Models\RefreshTokenModel();
-        $refreshTokenModel->where('user_id', $parentUser->id)->delete();
-        $refreshTokenModel->save([
-            'school_id'  => $parentUser->school_id,
-            'user_id'    => $parentUser->id,
-            'token'      => $refreshTokenString,
-            'expires_at' => date('Y-m-d H:i:s', time() + 86400), // 1 day
-        ]);
-
         return $this->respondSuccess([
-            'access_token'  => $accessToken,
-            'refresh_token' => $refreshTokenString,
-            'user' => [
-                'id'        => $parentUser->id,
-                'email'     => $parentUser->email,
-                'role'      => $parentUser->role,
-                'full_name' => $parentUser->full_name,
-                'school_id' => $parentUser->school_id,
-            ],
+            'code' => (new \App\Services\ImpersonationService())->createCode((int) $parentUser->school_id, (int) $parentUser->id),
             'student' => [
                 'id'        => $student->id,
                 'full_name' => $student->full_name,
             ],
-        ], 'Parent impersonation session generated successfully');
+        ], 'Single-use parent impersonation code generated');
+    }
+
+    private function hasStudentCapacity(int $additional): bool
+    {
+        $schoolId = defined('CURRENT_SCHOOL_ID') ? (int) CURRENT_SCHOOL_ID : 0;
+        if (!$schoolId) return false;
+        $limit = (new \App\Services\PlanService())->studentLimit($schoolId);
+        $current = (new StudentModel())->where('status', 'aktif')->countAllResults();
+        return $current + $additional <= $limit;
     }
 }

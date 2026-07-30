@@ -10,7 +10,7 @@ class SubscriptionModel extends BaseModel
     protected $returnType       = 'object';
     protected $protectFields    = true;
     protected $allowedFields    = [
-        'school_id', 'plan_name', 'start_date', 'end_date', 'status'
+        'school_id', 'plan_name', 'billing_cycle', 'start_date', 'end_date', 'status'
     ];
 
     // Dates

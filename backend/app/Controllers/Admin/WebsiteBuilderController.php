@@ -69,7 +69,7 @@ class WebsiteBuilderController extends BaseResourceController
     {
         $schoolId = defined('CURRENT_SCHOOL_ID') ? CURRENT_SCHOOL_ID : null;
         $settings = $this->webSettingsModel->where('school_id', $schoolId)->first();
-        
+
         $data = $this->request->getPost();
 
         // Decode JSON arrays sent as string fields from form-data
@@ -82,12 +82,25 @@ class WebsiteBuilderController extends BaseResourceController
         if (isset($data['slider_images']) && is_string($data['slider_images'])) {
             $data['slider_images'] = json_decode($data['slider_images'], true);
         }
+        if (isset($data['bank_accounts']) && is_string($data['bank_accounts'])) {
+            $data['bank_accounts'] = json_decode($data['bank_accounts'], true);
+        }
 
         // Handle Logo Upload
         $logoFile = $this->request->getFile('logo_file');
         if ($logoFile && $logoFile->isValid()) {
             try {
                 $data['logo'] = $this->uploadService->uploadImage($logoFile, 'uploads/website');
+            } catch (Exception $e) {
+                return $this->respondError($e->getMessage(), ResponseInterface::HTTP_BAD_REQUEST);
+            }
+        }
+
+        // Handle Letterhead Logo Upload
+        $letterheadLogoFile = $this->request->getFile('letterhead_logo_file');
+        if ($letterheadLogoFile && $letterheadLogoFile->isValid()) {
+            try {
+                $data['letterhead_logo'] = $this->uploadService->uploadImage($letterheadLogoFile, 'uploads/website');
             } catch (Exception $e) {
                 return $this->respondError($e->getMessage(), ResponseInterface::HTTP_BAD_REQUEST);
             }
@@ -123,6 +136,9 @@ class WebsiteBuilderController extends BaseResourceController
         if (isset($data['slider_images']) && is_array($data['slider_images'])) {
             $data['slider_images'] = json_encode($data['slider_images']);
         }
+        if (isset($data['bank_accounts']) && is_array($data['bank_accounts'])) {
+            $data['bank_accounts'] = json_encode($data['bank_accounts']);
+        }
 
         $this->webSettingsModel->update($settings->id, $data);
         $this->invalidateCache($schoolId);
@@ -145,6 +161,9 @@ class WebsiteBuilderController extends BaseResourceController
             }
             if (isset($settings->slider_images) && is_string($settings->slider_images)) {
                 $settings->slider_images = json_decode($settings->slider_images);
+            }
+            if (isset($settings->bank_accounts) && is_string($settings->bank_accounts)) {
+                $settings->bank_accounts = json_decode($settings->bank_accounts);
             }
         }
         return $settings;
@@ -183,7 +202,7 @@ class WebsiteBuilderController extends BaseResourceController
     public function createContent(): ResponseInterface
     {
         $data = $this->request->getPost();
-        
+
         $imageFile = $this->request->getFile('image_file');
         if ($imageFile && $imageFile->isValid()) {
             try {
@@ -224,14 +243,14 @@ class WebsiteBuilderController extends BaseResourceController
     public function getContents(): ResponseInterface
     {
         $type = $this->request->getVar('type');
-        
+
         $db = \Config\Database::connect();
         $builder = $db->table('school_contents')
             ->select('school_contents.*, news_categories.name as category_name')
             ->join('news_categories', 'news_categories.id = school_contents.category_id', 'left')
             ->where('school_contents.school_id', defined('CURRENT_SCHOOL_ID') ? CURRENT_SCHOOL_ID : null)
             ->where('school_contents.deleted_at IS NULL');
-        
+
         if ($type) {
             $builder->where('school_contents.type', $type);
         }
@@ -251,7 +270,7 @@ class WebsiteBuilderController extends BaseResourceController
         }
 
         $data = $this->request->getPost();
-        
+
         $imageFile = $this->request->getFile('image_file');
         if ($imageFile && $imageFile->isValid()) {
             try {
@@ -320,10 +339,10 @@ class WebsiteBuilderController extends BaseResourceController
     public function createCategory(): ResponseInterface
     {
         $categoryModel = new \App\Models\NewsCategoryModel();
-        
+
         // Support JSON request payloads from Axios
         $name = $this->request->getVar('name');
-        
+
         if (empty($name)) {
             return $this->respondError('Category Name is required', ResponseInterface::HTTP_BAD_REQUEST);
         }
@@ -389,7 +408,7 @@ class WebsiteBuilderController extends BaseResourceController
         if (!$schoolId) return;
         $cache = \Config\Services::cache();
         $cache->delete("school_profile_{$schoolId}");
-        
+
         $schoolModel = new \App\Models\SchoolModel();
         $school = $schoolModel->find($schoolId);
         if ($school && !empty($school->subdomain)) {
@@ -417,7 +436,7 @@ class WebsiteBuilderController extends BaseResourceController
         // Fetch subscription info
         $subModel = new \App\Models\SubscriptionModel();
         $subscription = $subModel->where('school_id', $schoolId)->where('status', 'active')->first();
-        
+
         $planName = $subscription ? $subscription->plan_name : 'premium'; // default trial is premium
         $billingCycle = $subscription ? $subscription->billing_cycle : 'monthly'; // default monthly
 
@@ -469,30 +488,17 @@ class WebsiteBuilderController extends BaseResourceController
         $documentPath = null;
 
         if ($file && $file->isValid() && !$file->hasMoved()) {
-            // Validation rules: max size 5MB, zip/pdf/jpeg/png
-            $rules = [
-                'document_file' => [
-                    'rules' => 'uploaded[document_file]|max_size[document_file,5120]|ext_in[document_file,zip,rar,pdf,jpg,jpeg,png]',
-                    'errors' => [
-                        'max_size' => 'Ukuran berkas dokumen terlalu besar, maksimal 5MB.',
-                        'ext_in' => 'Format berkas dokumen tidak didukung. Harap upload format ZIP, PDF, JPG, atau PNG.'
-                    ]
-                ]
-            ];
-
-            if (!$this->validate($rules)) {
-                return $this->respondError($this->validator->getError('document_file'), ResponseInterface::HTTP_BAD_REQUEST);
+            try {
+                $documentPath = (new \App\Libraries\UploadService())
+                    ->uploadPrivateDocument($file, 'domains/' . $schoolId);
+            } catch (\Exception $e) {
+                return $this->respondError($e->getMessage(), ResponseInterface::HTTP_BAD_REQUEST);
             }
-
-            // Move to uploads directory
-            $newName = $file->getRandomName();
-            $file->move(ROOTPATH . 'public/uploads/documents', $newName);
-            $documentPath = 'uploads/documents/' . $newName;
         }
 
         // 4. Save Domain Request
         $domainReqModel = new \App\Models\DomainRequestModel();
-        
+
         // Deactivate previous requests if any (soft delete)
         $domainReqModel->where('school_id', $schoolId)->whereIn('status', ['pending', 'rejected'])->delete();
 
@@ -518,5 +524,135 @@ class WebsiteBuilderController extends BaseResourceController
         $this->invalidateCache($schoolId);
 
         return $this->respondSuccess(null, 'Pengajuan custom domain berhasil dikirim. Super Admin akan memproses pengajuan Anda.');
+    }
+
+    // ==========================================
+    // CUSTOM PAGES CRUD
+    // ==========================================
+
+    /**
+     * GET /api/v1/admin/website/pages
+     */
+    public function getPages(): ResponseInterface
+    {
+        $schoolId = defined('CURRENT_SCHOOL_ID') ? CURRENT_SCHOOL_ID : null;
+        $pages = $this->contentModel->where('school_id', $schoolId)
+                                    ->where('type', 'page')
+                                    ->orderBy('created_at', 'DESC')
+                                    ->findAll();
+        return $this->respondSuccess($pages);
+    }
+
+    /**
+     * POST /api/v1/admin/website/pages
+     */
+    public function createPage(): ResponseInterface
+    {
+        $schoolId = defined('CURRENT_SCHOOL_ID') ? CURRENT_SCHOOL_ID : null;
+        $title = $this->request->getVar('title');
+        $content = $this->request->getVar('content');
+        $status = $this->request->getVar('status') ?: 'published';
+
+        if (empty($title)) {
+            return $this->respondError('Judul halaman wajib diisi.', ResponseInterface::HTTP_BAD_REQUEST);
+        }
+
+        // Generate slug
+        $slug = preg_replace('/[^a-z0-9-]+/', '-', strtolower(trim($title)));
+        $slug = trim($slug, '-');
+
+        // Check unique slug within the school
+        $existing = $this->contentModel->where('school_id', $schoolId)
+                                       ->where('type', 'page')
+                                       ->where('slug', $slug)
+                                       ->first();
+        if ($existing) {
+            $slug = $slug . '-' . time();
+        }
+
+        $data = [
+            'school_id'  => $schoolId,
+            'type'       => 'page',
+            'title'      => $title,
+            'slug'       => $slug,
+            'content'    => $content,
+            'status'     => $status,
+            'created_by' => $this->request->user ? $this->request->user->id : null
+        ];
+
+        if (!$this->contentModel->insert($data)) {
+            return $this->respondError('Gagal menyimpan halaman.', ResponseInterface::HTTP_BAD_REQUEST, $this->contentModel->errors());
+        }
+
+        $insertId = $this->contentModel->getInsertID();
+        $this->invalidateCache($schoolId);
+
+        $newPage = $this->contentModel->find($insertId);
+        return $this->respondSuccess($newPage, 'Halaman kustom berhasil dibuat.');
+    }
+
+    /**
+     * POST /api/v1/admin/website/pages/update/{id}
+     */
+    public function updatePage($id = null): ResponseInterface
+    {
+        $schoolId = defined('CURRENT_SCHOOL_ID') ? CURRENT_SCHOOL_ID : null;
+        $page = $this->contentModel->find($id);
+        if (!$page || $page->school_id !== $schoolId || $page->type !== 'page') {
+            return $this->respondError('Halaman tidak ditemukan.', ResponseInterface::HTTP_NOT_FOUND);
+        }
+
+        $title = $this->request->getVar('title');
+        $content = $this->request->getVar('content');
+        $status = $this->request->getVar('status');
+
+        $data = [];
+        if ($title !== null) {
+            $data['title'] = $title;
+            // Generate slug if title changes
+            $slug = preg_replace('/[^a-z0-9-]+/', '-', strtolower(trim($title)));
+            $slug = trim($slug, '-');
+
+            $existing = $this->contentModel->where('school_id', $schoolId)
+                                           ->where('type', 'page')
+                                           ->where('slug', $slug)
+                                           ->where('id !=', $id)
+                                           ->first();
+            if ($existing) {
+                $slug = $slug . '-' . time();
+            }
+            $data['slug'] = $slug;
+        }
+        if ($content !== null) {
+            $data['content'] = $content;
+        }
+        if ($status !== null) {
+            $data['status'] = $status;
+        }
+
+        $data['updated_by'] = $this->request->user ? $this->request->user->id : null;
+
+        $this->contentModel->update($id, $data);
+        $this->invalidateCache($schoolId);
+
+        $updatedPage = $this->contentModel->find($id);
+        return $this->respondSuccess($updatedPage, 'Halaman kustom berhasil diperbarui.');
+    }
+
+    /**
+     * DELETE /api/v1/admin/website/pages/delete/{id}
+     */
+    public function deletePage($id = null): ResponseInterface
+    {
+        $schoolId = defined('CURRENT_SCHOOL_ID') ? CURRENT_SCHOOL_ID : null;
+        $page = $this->contentModel->find($id);
+        if (!$page || $page->school_id !== $schoolId || $page->type !== 'page') {
+            return $this->respondError('Halaman tidak ditemukan.', ResponseInterface::HTTP_NOT_FOUND);
+        }
+
+        $this->contentModel->delete($id);
+        $this->invalidateCache($schoolId);
+
+        return $this->respondSuccess(null, 'Halaman kustom berhasil dihapus.');
     }
 }

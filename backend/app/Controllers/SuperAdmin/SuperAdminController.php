@@ -86,15 +86,87 @@ class SuperAdminController extends BaseResourceController
                            ->where('role', 'admin')
                            ->first();
 
-        if ($admin && !empty($admin->phone)) {
+        if ($admin && !empty($school->phone)) {
             $fonnte = new \App\Libraries\FonnteService();
             $statusText = $status === 'active' ? 'AKTIF' : 'NON-AKTIF';
             $message = "Halo *{$admin->full_name}*,\n\nStatus keanggotaan sekolah Anda *{$school->name}* saat ini telah diubah menjadi: *{$statusText}* oleh Administrator Pusat.\n\nJika ini adalah kekeliruan atau ada pertanyaan lebih lanjut, silakan hubungi tim dukungan kami.\n\nTerima kasih,\n*PAUDKU Pusat*";
-            $fonnte->sendMessage($admin->phone, $message);
+            $fonnte->sendMessage($school->phone, $message);
         }
 
         return $this->respondSuccess(null, "School status updated to {$status}");
     }
+
+    /**
+     * POST /api/v1/superadmin/schools/update/(:num)
+     */
+    public function updateSchool($id = null): ResponseInterface
+    {
+        if (!$id) {
+            return $this->respondError('School ID is required', ResponseInterface::HTTP_BAD_REQUEST);
+        }
+
+        $schoolModel = new SchoolModel();
+        $school = $schoolModel->find($id);
+
+        if (!$school) {
+            return $this->respondError('School not found', ResponseInterface::HTTP_NOT_FOUND);
+        }
+
+        $body = $this->getRequestBody();
+        $name = $body['name'] ?? null;
+        $npsn = $body['npsn'] ?? null;
+        $level = $body['level'] ?? null;
+        $subdomain = $body['subdomain'] ?? null;
+        $adminName = $body['admin_name'] ?? null;
+        $phone = $body['phone'] ?? null;
+
+        if (empty($name) || empty($subdomain) || empty($level)) {
+            return $this->respondError('Nama Sekolah, Subdomain, dan Jenjang wajib diisi.', ResponseInterface::HTTP_BAD_REQUEST);
+        }
+
+        // Validate level enum
+        if (!in_array($level, ['TK', 'SD', 'SMP', 'SMA', 'MTS_MA', 'SMK', 'PESANTREN'])) {
+            return $this->respondError('Jenjang sekolah tidak valid.', ResponseInterface::HTTP_BAD_REQUEST);
+        }
+
+        // Check if subdomain taken by other school
+        $duplicate = $schoolModel->where('subdomain', $subdomain)->where('id !=', $id)->first();
+        if ($duplicate) {
+            return $this->respondError('Subdomain sudah digunakan oleh sekolah lain.', ResponseInterface::HTTP_BAD_REQUEST);
+        }
+
+        $db = \Config\Database::connect();
+        $db->transStart();
+
+        // 1. Update School details
+        $schoolModel->update($id, [
+            'name'      => $name,
+            'npsn'      => $npsn,
+            'level'     => $level,
+            'subdomain' => $subdomain,
+            'phone'     => $phone,
+        ]);
+
+        // 2. Update Admin user details (if adminName is provided)
+        if (!empty($adminName)) {
+            $userModel = new UserModel();
+            $admin = $userModel->where('school_id', $id)->where('role', 'admin')->first();
+            if ($admin) {
+                $userModel->update($admin->id, [
+                    'full_name' => $adminName
+                ]);
+            }
+        }
+
+        $db->transComplete();
+
+        if ($db->transStatus() === false) {
+            return $this->respondError('Gagal memperbarui data sekolah.', ResponseInterface::HTTP_INTERNAL_SERVER_ERROR);
+        }
+
+        return $this->respondSuccess(null, 'Data sekolah berhasil diperbarui.');
+    }
+
 
     /**
      * POST /api/v1/superadmin/cache/clear
@@ -152,40 +224,10 @@ class SuperAdminController extends BaseResourceController
             return $this->respondError('Active Administrator user not found for this school', ResponseInterface::HTTP_NOT_FOUND);
         }
 
-        $jwtService = new \App\Libraries\JWTService();
-        
-        $payload = [
-            'id'        => $admin->id,
-            'school_id' => $admin->school_id,
-            'email'     => $admin->email,
-            'role'      => $admin->role,
-            'full_name' => $admin->full_name
-        ];
-        
-        $accessToken = $jwtService->generateToken($payload);
-        $refreshTokenString = bin2hex(random_bytes(32));
-
-        $refreshTokenModel = new \App\Models\RefreshTokenModel();
-        $refreshTokenModel->where('user_id', $admin->id)->delete();
-        $refreshTokenModel->save([
-            'school_id'  => $admin->school_id,
-            'user_id'    => $admin->id,
-            'token'      => $refreshTokenString,
-            'expires_at' => date('Y-m-d H:i:s', time() + 2592000)
-        ]);
-
         return $this->respondSuccess([
-            'access_token'  => $accessToken,
-            'refresh_token' => $refreshTokenString,
-            'user' => [
-                'id'        => $admin->id,
-                'email'     => $admin->email,
-                'role'      => $admin->role,
-                'full_name' => $admin->full_name,
-                'school_id' => $admin->school_id
-            ],
+            'code' => (new \App\Services\ImpersonationService())->createCode((int) $admin->school_id, (int) $admin->id),
             'subdomain' => $school->subdomain
-        ], 'Impersonate session generated successfully');
+        ], 'Single-use impersonation code generated');
     }
 
     /**
@@ -235,7 +277,7 @@ class SuperAdminController extends BaseResourceController
             'admin' => $admin ? [
                 'full_name' => $admin->full_name,
                 'email' => $admin->email,
-                'phone' => $admin->phone,
+                'phone' => $school->phone,
             ] : null,
             'stats' => [
                 'total_students' => $totalStudents,
@@ -398,6 +440,11 @@ class SuperAdminController extends BaseResourceController
 
         // Update school's custom_domain and custom_domain_status
         $schoolModel = new \App\Models\SchoolModel();
+        $domainOwner = $schoolModel->where('custom_domain', $request->requested_domain)
+            ->where('id !=', $request->school_id)->first();
+        if ($domainOwner) {
+            return $this->respondError('Domain is already assigned to another school', ResponseInterface::HTTP_CONFLICT);
+        }
         $schoolModel->update($request->school_id, [
             'custom_domain' => $request->requested_domain,
             'custom_domain_status' => 'active'
@@ -438,5 +485,22 @@ class SuperAdminController extends BaseResourceController
 
         return $this->respondSuccess(null, 'Domain request rejected successfully');
     }
-}
 
+    public function downloadDomainDocument($id = null): ResponseInterface
+    {
+        $request = (new \App\Models\DomainRequestModel())->find($id);
+        if (!$request || !$request->document_file) {
+            return $this->respondError('Document not found', ResponseInterface::HTTP_NOT_FOUND);
+        }
+
+        $base = realpath(WRITEPATH . 'uploads/domains');
+        $file = realpath(WRITEPATH . 'uploads/' . ltrim($request->document_file, '/'));
+        if (!$base || !$file || !str_starts_with($file, $base . DIRECTORY_SEPARATOR) || !is_file($file)) {
+            return $this->respondError('Document not found', ResponseInterface::HTTP_NOT_FOUND);
+        }
+
+        return $this->response->download($file, null)->setFileName(
+            'domain-request-' . $request->id . '.' . pathinfo($file, PATHINFO_EXTENSION)
+        );
+    }
+}

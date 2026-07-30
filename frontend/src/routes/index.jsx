@@ -1,6 +1,7 @@
 import React, { lazy, Suspense } from 'react';
 import { createBrowserRouter, RouterProvider, Navigate } from 'react-router-dom';
 import { Loader2 } from 'lucide-react';
+import { useAuth } from '../context/AuthContext';
 
 // Loader Component for Suspense
 const SuspenseLoader = () => (
@@ -15,6 +16,24 @@ const withSuspense = (LazyComponent) => (props) => (
     <LazyComponent {...props} />
   </Suspense>
 );
+
+function ProtectedRoute({ roles, children }) {
+  const { user, loading } = useAuth();
+
+  if (loading) return <SuspenseLoader />;
+  if (!user) return <Navigate to="/login" replace />;
+  if (roles && !roles.includes(user.role)) {
+    const homeByRole = {
+      superadmin: '/superadmin',
+      admin: '/admin',
+      teacher: '/teacher',
+      parent: '/parent',
+    };
+    return <Navigate to={homeByRole[user.role] || '/'} replace />;
+  }
+
+  return children;
+}
 
 // Lazy Loaded Pages
 const Login = withSuspense(lazy(() => import('../pages/auth/Login')));
@@ -31,9 +50,20 @@ const TeacherList = withSuspense(lazy(() => import('../pages/admin/teachers/Teac
 const SppManager = withSuspense(lazy(() => import('../pages/admin/spp/SppManager')));
 const ReportManager = withSuspense(lazy(() => import('../pages/admin/reports/ReportManager')));
 const AttendanceJournalManager = withSuspense(lazy(() => import('../pages/admin/reports/AttendanceJournalManager')));
+const AttendanceAnalytics = withSuspense(lazy(() => import('../pages/admin/reports/AttendanceAnalytics')));
+const Accreditation = withSuspense(lazy(() => import('../pages/admin/Accreditation')));
+const ESurat = withSuspense(lazy(() => import('../pages/admin/ESurat')));
+const GalleryManager = withSuspense(lazy(() => import('../pages/admin/GalleryManager')));
+const EventManager = withSuspense(lazy(() => import('../pages/admin/EventManager')));
+const ExtracurricularManager = withSuspense(lazy(() => import('../pages/admin/ExtracurricularManager')));
+const KbmScheduleManager = withSuspense(lazy(() => import('../pages/admin/KbmScheduleManager')));
+const CommunicationCenter = withSuspense(lazy(() => import('../pages/communication/CommunicationCenter')));
+const AttendanceKiosk = withSuspense(lazy(() => import('../pages/kiosk/AttendanceKiosk')));
 
 const SchoolHome = withSuspense(lazy(() => import('../pages/public/SchoolHome')));
+const SchoolNewsList = withSuspense(lazy(() => import('../pages/public/SchoolNewsList')));
 const SchoolNewsDetail = withSuspense(lazy(() => import('../pages/public/SchoolNewsDetail')));
+const SchoolPageDetail = withSuspense(lazy(() => import('../pages/public/SchoolPageDetail')));
 const PpdbRegistrationForm = withSuspense(lazy(() => import('../pages/public/PpdbRegistrationForm')));
 const PpdbStatusTracker = withSuspense(lazy(() => import('../pages/public/PpdbStatusTracker')));
 const PpdbAdminDashboard = withSuspense(lazy(() => import('../pages/admin/ppdb/PpdbAdminDashboard')));
@@ -41,6 +71,7 @@ const AdminDashboard = withSuspense(lazy(() => import('../pages/admin/AdminDashb
 const BillingOverview = withSuspense(lazy(() => import('../pages/admin/billing/BillingOverview')));
 const BillingCheckout = withSuspense(lazy(() => import('../pages/admin/billing/BillingCheckout')));
 const LandingPage = withSuspense(lazy(() => import('../pages/public/LandingPage')));
+const PrivacyPolicy = withSuspense(lazy(() => import('../pages/public/PrivacyPolicy')));
 
 const SuperAdminDashboard = withSuspense(lazy(() => import('../pages/superadmin/SuperAdminDashboard')));
 const TeacherDashboard = withSuspense(lazy(() => import('../pages/teacher/TeacherDashboard')));
@@ -56,8 +87,11 @@ function SubdomainRoot() {
     subdomain === 'localhost' || 
     subdomain === '127' || 
     subdomain === 'paudku' || 
+    subdomain === 'koola' ||
     host === 'paudku.local' || 
+    host === 'koola.local' ||
     host === 'paudku.id' ||
+    host === 'koola.id' ||
     host === 'pusdatin.my.id' ||
     host.endsWith('pusdatin.my.id.local');
 
@@ -66,6 +100,12 @@ function SubdomainRoot() {
   }
 
   return <SchoolHome />;
+}
+
+function CommunicationRedirect() {
+  const { user } = useAuth();
+  if (!user) return <Navigate to="/login" replace />;
+  return <Navigate to={`/${user.role}/communication`} replace />;
 }
 
 const router = createBrowserRouter([
@@ -84,6 +124,10 @@ const router = createBrowserRouter([
     element: <PpdbStatusTracker />,
   },
   {
+    path: '/news',
+    element: <SchoolNewsList />,
+  },
+  {
     path: '/news/:slug',
     element: <SchoolNewsDetail />,
   },
@@ -93,8 +137,16 @@ const router = createBrowserRouter([
     element: <SchoolHome />,
   },
   {
+    path: '/school/:schoolSlug/news',
+    element: <SchoolNewsList />,
+  },
+  {
     path: '/school/:schoolSlug/news/:slug',
     element: <SchoolNewsDetail />,
+  },
+  {
+    path: '/school/:schoolSlug/page/:slug',
+    element: <SchoolPageDetail />,
   },
   {
     path: '/school/:schoolSlug/ppdb',
@@ -110,6 +162,10 @@ const router = createBrowserRouter([
     element: <Login />,
   },
   {
+    path: '/privacy',
+    element: <PrivacyPolicy />,
+  },
+  {
     path: '/forgot-password',
     element: <ForgotPassword />,
   },
@@ -121,7 +177,7 @@ const router = createBrowserRouter([
   // SaaS Super Admin
   {
     path: '/superadmin',
-    element: <SuperAdminDashboard />,
+    element: <ProtectedRoute roles={['superadmin']}><SuperAdminDashboard /></ProtectedRoute>,
   },
   // School Admin Panel
   {
@@ -149,6 +205,10 @@ const router = createBrowserRouter([
     element: <AdminLayout><AttendanceJournalManager /></AdminLayout>,
   },
   {
+    path: '/admin/attendance/analytics',
+    element: <AdminLayout><AttendanceAnalytics /></AdminLayout>,
+  },
+  {
     path: '/admin/users',
     element: <AdminLayout><UserManager /></AdminLayout>,
   },
@@ -173,6 +233,30 @@ const router = createBrowserRouter([
     element: <AdminLayout><PpdbAdminDashboard /></AdminLayout>,
   },
   {
+    path: '/admin/accreditation',
+    element: <AdminLayout><Accreditation /></AdminLayout>,
+  },
+  {
+    path: '/admin/e-surat',
+    element: <AdminLayout><ESurat /></AdminLayout>,
+  },
+  {
+    path: '/admin/gallery',
+    element: <AdminLayout><GalleryManager /></AdminLayout>,
+  },
+  {
+    path: '/admin/events',
+    element: <AdminLayout><EventManager /></AdminLayout>,
+  },
+  {
+    path: '/admin/extracurriculars',
+    element: <AdminLayout><ExtracurricularManager /></AdminLayout>,
+  },
+  {
+    path: '/admin/kbm-schedules',
+    element: <AdminLayout><KbmScheduleManager /></AdminLayout>,
+  },
+  {
     path: '/admin/billing',
     element: <AdminLayout><BillingOverview /></AdminLayout>,
   },
@@ -180,21 +264,41 @@ const router = createBrowserRouter([
     path: '/admin/billing/checkout',
     element: <AdminLayout><BillingCheckout /></AdminLayout>,
   },
+  {
+    path: '/admin/communication',
+    element: <AdminLayout><CommunicationCenter /></AdminLayout>,
+  },
   // Teacher Panel
   {
     path: '/teacher',
-    element: <TeacherDashboard />,
+    element: <ProtectedRoute roles={['teacher']}><TeacherDashboard /></ProtectedRoute>,
+  },
+  {
+    path: '/teacher/communication',
+    element: <ProtectedRoute roles={['teacher']}><CommunicationCenter /></ProtectedRoute>,
   },
   // Parent Portal
   {
     path: '/parent',
-    element: <ParentDashboard />,
+    element: <ProtectedRoute roles={['parent']}><ParentDashboard /></ProtectedRoute>,
+  },
+  {
+    path: '/parent/communication',
+    element: <ProtectedRoute roles={['parent']}><CommunicationCenter /></ProtectedRoute>,
+  },
+  {
+    path: '/communication',
+    element: <ProtectedRoute roles={['admin', 'teacher', 'parent']}><CommunicationRedirect /></ProtectedRoute>,
   },
   
   // Settings & Profile (shared auth route example)
   {
     path: '/profile',
-    element: <Profile />,
+    element: <ProtectedRoute><Profile /></ProtectedRoute>,
+  },
+  {
+    path: '/kiosk',
+    element: <AttendanceKiosk />,
   },
   
   // Fallback

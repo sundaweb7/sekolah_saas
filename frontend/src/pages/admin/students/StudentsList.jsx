@@ -1,15 +1,15 @@
 import { useState, useEffect } from 'react';
 import api from '../../../config/axios';
 import ConfirmModal from '../../../components/ConfirmModal';
-import { 
-  Plus, Search, Download, Upload, Trash2, Edit2, 
-  ChevronLeft, ChevronRight, UserPlus, AlertCircle, RefreshCw, X, Loader2, LogIn
+import {
+  Plus, Search, Download, Upload, Trash2, Edit2,
+  ChevronLeft, ChevronRight, UserPlus, AlertCircle, RefreshCw, X, Loader2, LogIn,
+  Users, GraduationCap, ArrowLeftRight
 } from 'lucide-react';
 
 export default function StudentsList() {
   const [students, setStudents] = useState([]);
   const [classes, setClasses] = useState([]);
-  const [parents, setParents] = useState([]); // to select a parent user
   const [loading, setLoading] = useState(true);
   const [searchQuery, setSearchQuery] = useState('');
   const [page, setPage] = useState(1);
@@ -41,9 +41,28 @@ export default function StudentsList() {
   const [status, setStatus] = useState('aktif');
   const [photoFile, setPhotoFile] = useState(null);
 
+  const [stats, setStats] = useState({
+    total_active: 0,
+    total_male: 0,
+    total_female: 0,
+    total_mutation: 0
+  });
+
+  const fetchStudentStats = async () => {
+    try {
+      const statsRes = await api.get('/admin/students/stats');
+      if (statsRes.data) {
+        setStats(statsRes.data);
+      }
+    } catch (error) {
+      console.error('Failed to fetch student stats', error);
+    }
+  };
+
   const fetchStudents = async () => {
     setLoading(true);
     try {
+      fetchStudentStats(); // Also fetch counts cards
       const response = await api.get('/admin/students', {
         params: {
           page: page,
@@ -64,17 +83,10 @@ export default function StudentsList() {
     }
   };
 
-  const fetchClassesAndParents = async () => {
+  const fetchClasses = async () => {
     try {
-      // Fetch Classes
       const classRes = await api.get('/admin/classes');
       setClasses(classRes.data || []);
-
-      // Fetch Parent Users (users role=parent) from default user lookup if any, or mock
-      // Since it's a multi-tenant school admin, we can fetch all users with role 'parent'
-      // We will make a simple check, if it fails, we fall back to empty.
-      const parentRes = await api.get('/auth/profile'); // dummy or fetch endpoint
-      // We can also let admin enter parent user ID or look it up. Let's make it a simple text input/dropdown.
     } catch (err) {
       console.error('Failed to fetch support list data', err);
     }
@@ -85,7 +97,7 @@ export default function StudentsList() {
   }, [page, searchQuery, statusTab]);
 
   useEffect(() => {
-    fetchClassesAndParents();
+    fetchClasses();
   }, []);
 
   const handleExport = async () => {
@@ -149,10 +161,10 @@ export default function StudentsList() {
     setImpersonatingId(studentId);
     try {
       const res = await api.post(`/admin/students/impersonate-parent/${studentId}`);
-      const { access_token, refresh_token, user } = res.data;
+      const { code } = res.data;
       const protocol = window.location.protocol;
       const host = window.location.host;
-      const redirectUrl = `${protocol}//${host}/login?sso_token=${access_token}&sso_refresh_token=${refresh_token}&sso_school_id=${user.school_id}&sso_role=${user.role}`;
+      const redirectUrl = `${protocol}//${host}/login?impersonation_code=${encodeURIComponent(code)}`;
       window.open(redirectUrl, '_blank');
     } catch (err) {
       setMessage({ type: 'error', text: err.message || `Gagal masuk sebagai wali ${studentName}.` });
@@ -208,7 +220,7 @@ export default function StudentsList() {
     if (classId) formData.append('current_class_id', classId);
     if (parentId) formData.append('parent_user_id', parentId);
     formData.append('status', status);
-    
+
     // Parent Account Info
     if (parentEmail) formData.append('parent_email', parentEmail);
     if (parentName) formData.append('parent_name', parentName);
@@ -242,28 +254,28 @@ export default function StudentsList() {
 
   return (
     <div className="p-6 md:p-8 max-w-7xl mx-auto w-full space-y-6">
-      
+
       {/* Header Section */}
-      <div className="flex flex-col md:flex-row md:items-center md:justify-between gap-4 border-b border-zinc-900 pb-5">
+      <div className="flex flex-col md:flex-row md:items-center md:justify-between gap-4 border-b border-zinc-200 pb-5">
         <div>
-          <h1 className="text-3xl font-extrabold tracking-tight text-white">Database Siswa</h1>
-          <p className="mt-1 text-sm text-zinc-400">
+          <h1 className="text-3xl font-extrabold tracking-tight text-zinc-900">Database Siswa</h1>
+          <p className="mt-1 text-sm text-zinc-500">
             Kelola, ekspor, dan impor seluruh profil data siswa sekolah Anda secara mudah.
           </p>
         </div>
-        
+
         <div className="flex flex-wrap items-center gap-3">
           <button
             onClick={handleExport}
-            className="flex items-center gap-2 rounded-xl border border-zinc-800 bg-zinc-900/50 hover:bg-zinc-800 px-4 py-2.5 text-xs font-semibold text-white transition-colors"
+            className="flex items-center gap-2 rounded-xl border border-zinc-200 bg-white hover:bg-zinc-50 px-4 py-2.5 text-xs font-semibold text-zinc-700 shadow-sm transition-colors"
           >
             <Download className="h-4 w-4" />
             Ekspor Excel
           </button>
-          
+
           <button
             onClick={() => document.getElementById('import-input').click()}
-            className="flex items-center gap-2 rounded-xl border border-zinc-800 bg-zinc-900/50 hover:bg-zinc-800 px-4 py-2.5 text-xs font-semibold text-white transition-colors"
+            className="flex items-center gap-2 rounded-xl border border-zinc-200 bg-white hover:bg-zinc-50 px-4 py-2.5 text-xs font-semibold text-zinc-700 shadow-sm transition-colors"
           >
             <Upload className="h-4 w-4" />
             Impor Excel
@@ -280,14 +292,61 @@ export default function StudentsList() {
             }}
             className="hidden"
           />
-          
-          <button 
+
+          <button
             onClick={openAddModal}
-            className="flex items-center gap-2 rounded-xl bg-[#d4af37] hover:bg-[#f3cb65] px-4 py-2.5 text-xs font-bold text-black transition-colors"
+            className="flex items-center gap-2 rounded-xl bg-[#d9a425] hover:bg-[#e5c158] px-4 py-2.5 text-xs font-bold text-black shadow-sm transition-colors"
           >
             <Plus className="h-4 w-4" />
             Tambah Siswa
           </button>
+        </div>
+      </div>
+
+      {/* Kartu Ringkasan (Student Stats Summary) */}
+      <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-5">
+        {/* Card 1: Siswa Aktif */}
+        <div className="bg-[#18181b] border border-zinc-900 rounded-2xl p-5 flex items-center justify-between hover:border-[#d9a425]/30 transition-all duration-300">
+          <div className="space-y-1">
+            <p className="text-[10px] font-bold uppercase tracking-wider text-[#d9a425]">Siswa Permukiman / Aktif</p>
+            <p className="text-3xl font-black text-white">{stats.total_active}</p>
+          </div>
+          <div className="h-12 w-12 rounded-xl bg-zinc-900 flex items-center justify-center border border-zinc-800 shrink-0">
+            <GraduationCap className="h-6 w-6 text-[#d9a425]" />
+          </div>
+        </div>
+
+        {/* Card 2: Putra */}
+        <div className="bg-[#18181b] border border-zinc-900 rounded-2xl p-5 flex items-center justify-between hover:border-[#d9a425]/30 transition-all duration-300">
+          <div className="space-y-1">
+            <p className="text-[10px] font-bold uppercase tracking-wider text-[#d9a425]">Siswa Putra (L)</p>
+            <p className="text-3xl font-black text-white">{stats.total_male}</p>
+          </div>
+          <div className="h-12 w-12 rounded-xl bg-zinc-900 flex items-center justify-center border border-zinc-800 shrink-0">
+            <Users className="h-6 w-6 text-[#d9a425]" />
+          </div>
+        </div>
+
+        {/* Card 3: Putri */}
+        <div className="bg-[#18181b] border border-zinc-900 rounded-2xl p-5 flex items-center justify-between hover:border-[#d9a425]/30 transition-all duration-300">
+          <div className="space-y-1">
+            <p className="text-[10px] font-bold uppercase tracking-wider text-[#d9a425]">Siswa Putri (P)</p>
+            <p className="text-3xl font-black text-white">{stats.total_female}</p>
+          </div>
+          <div className="h-12 w-12 rounded-xl bg-zinc-900 flex items-center justify-center border border-zinc-800 shrink-0">
+            <Users className="h-6 w-6 text-[#d9a425]" />
+          </div>
+        </div>
+
+        {/* Card 4: Mutasi */}
+        <div className="bg-[#18181b] border border-zinc-900 rounded-2xl p-5 flex items-center justify-between hover:border-[#d9a425]/30 transition-all duration-300">
+          <div className="space-y-1">
+            <p className="text-[10px] font-bold uppercase tracking-wider text-[#d9a425]">Siswa Mutasi</p>
+            <p className="text-3xl font-black text-white">{stats.total_mutation}</p>
+          </div>
+          <div className="h-12 w-12 rounded-xl bg-zinc-900 flex items-center justify-center border border-zinc-800 shrink-0">
+            <ArrowLeftRight className="h-6 w-6 text-[#d9a425]" />
+          </div>
         </div>
       </div>
 
@@ -300,21 +359,21 @@ export default function StudentsList() {
 
       {/* Status Tab Bar */}
       <div className="flex border-b border-zinc-200 gap-2">
-        <button 
+        <button
           onClick={() => { setStatusTab('aktif'); setPage(1); }}
-          className={`px-4 py-2.5 text-xs font-bold uppercase tracking-wider border-b-2 transition-all ${statusTab === 'aktif' ? 'border-[#d4af37] text-zinc-900' : 'border-transparent text-zinc-500 hover:text-zinc-800'}`}
+          className={`px-4 py-2.5 text-xs font-bold uppercase tracking-wider border-b-2 transition-all ${statusTab === 'aktif' ? 'border-[#d9a425] text-zinc-900' : 'border-transparent text-zinc-500 hover:text-zinc-800'}`}
         >
           Siswa Aktif
         </button>
-        <button 
+        <button
           onClick={() => { setStatusTab('mutasi'); setPage(1); }}
-          className={`px-4 py-2.5 text-xs font-bold uppercase tracking-wider border-b-2 transition-all ${statusTab === 'mutasi' ? 'border-[#d4af37] text-zinc-900' : 'border-transparent text-zinc-500 hover:text-zinc-800'}`}
+          className={`px-4 py-2.5 text-xs font-bold uppercase tracking-wider border-b-2 transition-all ${statusTab === 'mutasi' ? 'border-[#d9a425] text-zinc-900' : 'border-transparent text-zinc-500 hover:text-zinc-800'}`}
         >
           Mutasi (Pindah)
         </button>
-        <button 
+        <button
           onClick={() => { setStatusTab('lulus'); setPage(1); }}
-          className={`px-4 py-2.5 text-xs font-bold uppercase tracking-wider border-b-2 transition-all ${statusTab === 'lulus' ? 'border-[#d4af37] text-zinc-900' : 'border-transparent text-zinc-500 hover:text-zinc-800'}`}
+          className={`px-4 py-2.5 text-xs font-bold uppercase tracking-wider border-b-2 transition-all ${statusTab === 'lulus' ? 'border-[#d9a425] text-zinc-900' : 'border-transparent text-zinc-500 hover:text-zinc-800'}`}
         >
           Lulus
         </button>
@@ -323,7 +382,7 @@ export default function StudentsList() {
       {/* Notifications */}
       {message && (
         <div className={`flex items-center gap-3 rounded-xl border p-4 text-sm ${
-          message.type === 'success' ? 'border-green-500/30 bg-green-500/10 text-green-400' : 'border-red-500/30 bg-red-500/10 text-red-400'
+          message.type === 'success' ? 'border-green-500/30 bg-green-500/10 text-green-700' : 'border-red-500/30 bg-red-500/10 text-red-700'
         }`}>
           <AlertCircle className="h-5 w-5 shrink-0" />
           <span>{message.text}</span>
@@ -332,29 +391,29 @@ export default function StudentsList() {
 
       {/* Search bar */}
       <div className="relative max-w-md">
-        <div className="pointer-events-none absolute inset-y-0 left-0 flex items-center pl-3 text-zinc-500">
+        <div className="pointer-events-none absolute inset-y-0 left-0 flex items-center pl-3 text-zinc-400">
           <Search className="h-5 w-5" />
         </div>
         <input
           type="text"
           value={searchQuery}
           onChange={(e) => setSearchQuery(e.target.value)}
-          className="block w-full rounded-xl border border-zinc-850 bg-zinc-900/30 py-2.5 pl-10 pr-3 text-sm text-white placeholder-zinc-500 outline-none focus:border-[#d4af37] focus:ring-1 focus:ring-[#d4af37]/20"
+          className="block w-full rounded-xl border border-zinc-200 bg-white py-2.5 pl-10 pr-3 text-sm text-zinc-800 placeholder-zinc-400 outline-none focus:border-[#d9a425] focus:ring-1 focus:ring-[#d9a425]/20"
           placeholder="Cari siswa berdasarkan nama atau nomor induk..."
         />
       </div>
 
       {/* Table / Grid */}
-      <div className="overflow-hidden rounded-2xl border border-zinc-850 bg-zinc-900/30 backdrop-blur-md">
+      <div className="overflow-hidden rounded-2xl border border-zinc-200/80 bg-white shadow-sm">
         {loading ? (
           <div className="flex h-64 items-center justify-center">
-            <RefreshCw className="h-8 w-8 animate-spin text-[#d4af37]" />
+            <RefreshCw className="h-8 w-8 animate-spin text-[#d9a425]" />
           </div>
         ) : students.length === 0 ? (
-          <div className="flex flex-col items-center justify-center p-12 text-center text-zinc-500 space-y-4">
-            <UserPlus className="h-12 w-12 text-zinc-700" />
+          <div className="flex flex-col items-center justify-center p-12 text-center text-zinc-400 space-y-4">
+            <UserPlus className="h-12 w-12 text-zinc-300" />
             <div>
-              <p className="font-semibold text-lg text-white">Belum Ada Data Siswa</p>
+              <p className="font-semibold text-lg text-zinc-700">Belum Ada Data Siswa</p>
               <p className="text-sm mt-1">Cari keyword lain atau klik Tambah Siswa di atas.</p>
             </div>
           </div>
@@ -362,7 +421,7 @@ export default function StudentsList() {
           <div className="overflow-x-auto">
             <table className="w-full text-left border-collapse">
               <thead>
-                <tr className="border-b border-zinc-900 bg-zinc-950/30 text-xs font-semibold uppercase tracking-wider text-zinc-400">
+                <tr className="border-b border-zinc-200 bg-zinc-55 text-xs font-bold uppercase tracking-wider text-zinc-500">
                   <th className="px-6 py-4">Foto</th>
                   <th className="px-6 py-4">No. Induk</th>
                   <th className="px-6 py-4">Nama Lengkap</th>
@@ -371,31 +430,31 @@ export default function StudentsList() {
                   <th className="px-6 py-4 text-right">Aksi</th>
                 </tr>
               </thead>
-              <tbody className="divide-y divide-zinc-900">
+              <tbody className="divide-y divide-zinc-150">
                 {students.map((student) => (
-                  <tr key={student.id} className="hover:bg-zinc-800/10 transition-colors">
+                  <tr key={student.id} className="hover:bg-zinc-50/50 transition-colors">
                     <td className="px-6 py-4">
-                      <div className="h-10 w-10 overflow-hidden rounded-full border border-zinc-800 bg-zinc-950">
+                      <div className="h-10 w-10 overflow-hidden rounded-full border border-zinc-200 bg-zinc-100 flex items-center justify-center">
                         {student.photo ? (
                           <img src={`http://${window.location.hostname}:8080/${student.photo}`} alt="" className="h-full w-full object-cover" />
                         ) : (
-                          <div className="flex h-full w-full items-center justify-center text-xs font-bold text-zinc-500 bg-zinc-800 uppercase">
+                          <div className="flex h-full w-full items-center justify-center text-xs font-bold text-zinc-450 bg-zinc-200 uppercase">
                             {student.full_name.charAt(0)}
                           </div>
                         )}
                       </div>
                     </td>
-                    <td className="px-6 py-4 font-mono text-sm text-zinc-300">
+                    <td className="px-6 py-4 font-mono text-sm text-zinc-600">
                       {student.registration_number || '-'}
                     </td>
-                    <td className="px-6 py-4 font-medium text-white">{student.full_name}</td>
-                    <td className="px-6 py-4 text-sm text-zinc-300">
+                    <td className="px-6 py-4 font-bold text-zinc-800">{student.full_name}</td>
+                    <td className="px-6 py-4 text-sm text-zinc-600">
                       {new Date(student.birth_date).toLocaleDateString('id-ID', { day: 'numeric', month: 'short', year: 'numeric' })}
                     </td>
-                    <td className="px-6 py-4 text-sm text-zinc-300">{student.gender}</td>
+                    <td className="px-6 py-4 text-sm text-zinc-600">{student.gender}</td>
                     <td className="px-6 py-4 text-right">
                       <div className="flex items-center justify-end gap-1">
-                        <button 
+                        <button
                           onClick={() => handleImpersonateParent(student.id, student.full_name)}
                           disabled={impersonatingId === student.id}
                           title="Login sebagai Wali Siswa"
@@ -408,16 +467,16 @@ export default function StudentsList() {
                           )}
                           Masuk sbg Wali
                         </button>
-                        <button 
+                        <button
                           onClick={() => openEditModal(student)}
-                          className="p-2 text-zinc-400 hover:text-[#d4af37] transition-colors"
+                          className="p-2 text-zinc-450 hover:text-[#d9a425] transition-colors"
                           title="Edit data siswa"
                         >
                           <Edit2 className="h-4 w-4" />
                         </button>
-                        <button 
+                        <button
                           onClick={() => handleDelete(student.id, student.full_name)}
-                          className="p-2 text-zinc-400 hover:text-red-400 transition-colors"
+                          className="p-2 text-zinc-450 hover:text-red-500 transition-colors"
                           title="Hapus siswa"
                         >
                           <Trash2 className="h-4 w-4" />
@@ -434,15 +493,15 @@ export default function StudentsList() {
 
       {/* Pagination Controls */}
       {totalPages > 1 && (
-        <div className="flex items-center justify-between border-t border-zinc-900 pt-4">
-          <span className="text-sm text-zinc-400">
+        <div className="flex items-center justify-between border-t border-zinc-200 pt-4">
+          <span className="text-sm text-zinc-500">
             Halaman {page} dari {totalPages}
           </span>
           <div className="flex gap-2">
             <button
               disabled={page <= 1}
               onClick={() => setPage(page - 1)}
-              className="flex items-center gap-1 rounded-xl border border-zinc-800 bg-zinc-900 px-3 py-1.5 text-xs text-white hover:bg-zinc-800 disabled:opacity-50 transition-colors"
+              className="flex items-center gap-1 rounded-xl border border-zinc-200 bg-white px-3 py-1.5 text-xs text-zinc-755 hover:bg-zinc-50 disabled:opacity-50 shadow-sm transition-colors"
             >
               <ChevronLeft className="h-4 w-4" />
               Sebelumnya
@@ -450,7 +509,7 @@ export default function StudentsList() {
             <button
               disabled={page >= totalPages}
               onClick={() => setPage(page + 1)}
-              className="flex items-center gap-1 rounded-xl border border-zinc-800 bg-zinc-900 px-3 py-1.5 text-xs text-white hover:bg-zinc-800 disabled:opacity-50 transition-colors"
+              className="flex items-center gap-1 rounded-xl border border-zinc-200 bg-white px-3 py-1.5 text-xs text-zinc-755 hover:bg-zinc-50 disabled:opacity-50 shadow-sm transition-colors"
             >
               Selanjutnya
               <ChevronRight className="h-4 w-4" />
@@ -461,61 +520,61 @@ export default function StudentsList() {
 
       {/* Student Form Modal */}
       {showModal && (
-        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/80 backdrop-blur-sm p-4">
-          <div className="w-full max-w-lg rounded-2xl border border-zinc-850 bg-zinc-950 p-6 shadow-2xl space-y-6">
-            <div className="flex items-center justify-between border-b border-zinc-900 pb-3">
-              <h3 className="text-lg font-bold text-white">
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/60 backdrop-blur-sm p-4">
+          <div className="w-full max-w-lg rounded-2xl border border-zinc-150 bg-white p-6 shadow-2xl space-y-6">
+            <div className="flex items-center justify-between border-b border-zinc-150 pb-3">
+              <h3 className="text-lg font-bold text-zinc-900">
                 {editingStudent ? 'Edit Profil Siswa' : 'Tambah Siswa Baru'}
               </h3>
-              <button onClick={() => setShowModal(false)} className="text-zinc-400 hover:text-white">
+              <button onClick={() => setShowModal(false)} className="text-zinc-400 hover:text-zinc-650">
                 <X className="h-5 w-5" />
               </button>
             </div>
 
             <form onSubmit={handleSubmit} className="space-y-4">
               <div>
-                <label className="block text-xs font-bold uppercase tracking-wider text-zinc-400">Nama Lengkap Siswa</label>
-                <input 
-                  type="text" 
+                <label className="block text-xs font-bold uppercase tracking-wider text-zinc-500">Nama Lengkap Siswa</label>
+                <input
+                  type="text"
                   required
                   value={fullName}
                   onChange={(e) => setFullName(e.target.value)}
                   placeholder="Masukkan nama lengkap siswa"
-                  className="block w-full mt-1.5 rounded-xl border border-zinc-850 bg-zinc-900 py-2.5 px-3.5 text-sm text-white focus:border-[#d4af37] focus:ring-1 focus:ring-[#d4af37]/20 outline-none"
+                  className="block w-full mt-1.5 rounded-xl border border-zinc-300 bg-white py-2.5 px-3.5 text-sm text-zinc-800 focus:border-[#d9a425] focus:ring-1 focus:ring-[#d9a425]/20 outline-none"
                 />
               </div>
 
               <div className="grid grid-cols-2 gap-4">
                 <div>
-                  <label className="block text-xs font-bold uppercase tracking-wider text-zinc-400">Nomor Induk / NISN</label>
-                  <input 
-                    type="text" 
+                  <label className="block text-xs font-bold uppercase tracking-wider text-zinc-500">Nomor Induk / NISN</label>
+                  <input
+                    type="text"
                     value={regNum}
                     onChange={(e) => setRegNum(e.target.value)}
                     placeholder="Contoh: NISN-9982"
-                    className="block w-full mt-1.5 rounded-xl border border-zinc-850 bg-zinc-900 py-2.5 px-3.5 text-sm text-white focus:border-[#d4af37] focus:ring-1 focus:ring-[#d4af37]/20 outline-none"
+                    className="block w-full mt-1.5 rounded-xl border border-zinc-300 bg-white py-2.5 px-3.5 text-sm text-zinc-800 focus:border-[#d9a425] focus:ring-1 focus:ring-[#d9a425]/20 outline-none"
                   />
                 </div>
 
                 <div>
-                  <label className="block text-xs font-bold uppercase tracking-wider text-zinc-400">Tanggal Lahir</label>
-                  <input 
-                    type="date" 
+                  <label className="block text-xs font-bold uppercase tracking-wider text-zinc-500">Tanggal Lahir</label>
+                  <input
+                    type="date"
                     required
                     value={birthDate}
                     onChange={(e) => setBirthDate(e.target.value)}
-                    className="block w-full mt-1.5 rounded-xl border border-zinc-850 bg-zinc-900 py-2.5 px-3.5 text-sm text-white focus:border-[#d4af37] outline-none"
+                    className="block w-full mt-1.5 rounded-xl border border-zinc-300 bg-white py-2.5 px-3.5 text-sm text-zinc-800 focus:border-[#d9a425] outline-none"
                   />
                 </div>
               </div>
 
               <div className="grid grid-cols-3 gap-4">
                 <div>
-                  <label className="block text-xs font-bold uppercase tracking-wider text-zinc-400">Jenis Kelamin</label>
-                  <select 
+                  <label className="block text-xs font-bold uppercase tracking-wider text-zinc-500">Jenis Kelamin</label>
+                  <select
                     value={gender}
                     onChange={(e) => setGender(e.target.value)}
-                    className="block w-full mt-1.5 rounded-xl border border-zinc-850 bg-zinc-900 py-2.5 px-3.5 text-sm text-white focus:border-[#d4af37] outline-none"
+                    className="block w-full mt-1.5 rounded-xl border border-zinc-300 bg-white py-2.5 px-3.5 text-sm text-zinc-800 focus:border-[#d9a425] outline-none"
                   >
                     <option value="L">Laki-laki (L)</option>
                     <option value="P">Perempuan (P)</option>
@@ -523,11 +582,11 @@ export default function StudentsList() {
                 </div>
 
                 <div>
-                  <label className="block text-xs font-bold uppercase tracking-wider text-zinc-400">Kelas Belajar</label>
-                  <select 
+                  <label className="block text-xs font-bold uppercase tracking-wider text-zinc-500">Kelas Belajar</label>
+                  <select
                     value={classId}
                     onChange={(e) => setClassId(e.target.value)}
-                    className="block w-full mt-1.5 rounded-xl border border-zinc-850 bg-zinc-900 py-2.5 px-3.5 text-sm text-white focus:border-[#d4af37] outline-none"
+                    className="block w-full mt-1.5 rounded-xl border border-zinc-300 bg-white py-2.5 px-3.5 text-sm text-zinc-800 focus:border-[#d9a425] outline-none"
                   >
                     <option value="">-- Tanpa Kelas --</option>
                     {classes.map((cls) => (
@@ -539,11 +598,11 @@ export default function StudentsList() {
                 </div>
 
                 <div>
-                  <label className="block text-xs font-bold uppercase tracking-wider text-zinc-400">Status Keaktifan</label>
-                  <select 
+                  <label className="block text-xs font-bold uppercase tracking-wider text-zinc-500">Status Keaktifan</label>
+                  <select
                     value={status}
                     onChange={(e) => setStatus(e.target.value)}
-                    className="block w-full mt-1.5 rounded-xl border border-zinc-850 bg-zinc-900 py-2.5 px-3.5 text-sm text-white focus:border-[#d4af37] outline-none"
+                    className="block w-full mt-1.5 rounded-xl border border-zinc-300 bg-white py-2.5 px-3.5 text-sm text-zinc-800 focus:border-[#d9a425] outline-none"
                   >
                     <option value="aktif">Siswa Aktif</option>
                     <option value="mutasi">Mutasi (Pindah)</option>
@@ -553,73 +612,73 @@ export default function StudentsList() {
               </div>
 
               {/* Parent Login Account Section */}
-              <div className="border-t border-zinc-900 pt-4 space-y-4">
-                <h4 className="text-xs font-bold uppercase tracking-wider text-[#d4af37]">
+              <div className="border-t border-zinc-150 pt-4 space-y-4">
+                <h4 className="text-xs font-bold uppercase tracking-wider text-[#d9a425]">
                   Akun Login Wali Murid
                 </h4>
-                
+
                 <div className="grid grid-cols-2 gap-4">
                   <div>
-                    <label className="block text-xs font-bold uppercase tracking-wider text-zinc-400">Email Login Wali</label>
-                    <input 
-                      type="email" 
+                    <label className="block text-xs font-bold uppercase tracking-wider text-zinc-500">Email Login Wali</label>
+                    <input
+                      type="email"
                       value={parentEmail}
                       onChange={(e) => setParentEmail(e.target.value)}
                       placeholder="email.wali@domain.com"
-                      className="block w-full mt-1.5 rounded-xl border border-zinc-850 bg-zinc-900 py-2.5 px-3.5 text-sm text-white focus:border-[#d4af37] outline-none"
+                      className="block w-full mt-1.5 rounded-xl border border-zinc-300 bg-white py-2.5 px-3.5 text-sm text-zinc-800 focus:border-[#d9a425] outline-none"
                     />
                   </div>
 
                   <div>
-                    <label className="block text-xs font-bold uppercase tracking-wider text-zinc-400">
+                    <label className="block text-xs font-bold uppercase tracking-wider text-zinc-500">
                       {editingStudent ? 'Kata Sandi Baru (Opsional)' : 'Kata Sandi (Password)'}
                     </label>
-                    <input 
-                      type="password" 
+                    <input
+                      type="password"
                       value={parentPassword}
                       onChange={(e) => setParentPassword(e.target.value)}
-                      placeholder={editingStudent ? 'Kosongkan jika tak diubah' : 'Min 6 karakter'}
-                      className="block w-full mt-1.5 rounded-xl border border-zinc-850 bg-zinc-900 py-2.5 px-3.5 text-sm text-white focus:border-[#d4af37] outline-none"
+                      placeholder={editingStudent ? 'Kosongkan jika tak diubah' : 'Min 8 karakter'}
+                      className="block w-full mt-1.5 rounded-xl border border-zinc-300 bg-white py-2.5 px-3.5 text-sm text-zinc-800 focus:border-[#d9a425] outline-none"
                     />
                   </div>
                 </div>
 
                 <div className="grid grid-cols-2 gap-4">
                   <div>
-                    <label className="block text-xs font-bold uppercase tracking-wider text-zinc-400">Nama Wali Murid</label>
-                    <input 
-                      type="text" 
+                    <label className="block text-xs font-bold uppercase tracking-wider text-zinc-500">Nama Wali Murid</label>
+                    <input
+                      type="text"
                       value={parentName}
                       onChange={(e) => setParentName(e.target.value)}
                       placeholder="Nama orang tua / wali"
-                      className="block w-full mt-1.5 rounded-xl border border-zinc-850 bg-zinc-900 py-2.5 px-3.5 text-sm text-white focus:border-[#d4af37] outline-none"
+                      className="block w-full mt-1.5 rounded-xl border border-zinc-300 bg-white py-2.5 px-3.5 text-sm text-zinc-800 focus:border-[#d9a425] outline-none"
                     />
                   </div>
 
                   <div>
-                    <label className="block text-xs font-bold uppercase tracking-wider text-zinc-400">No. WhatsApp / HP</label>
-                    <input 
-                      type="text" 
+                    <label className="block text-xs font-bold uppercase tracking-wider text-zinc-500">No. WhatsApp / HP</label>
+                    <input
+                      type="text"
                       value={parentPhone}
                       onChange={(e) => setParentPhone(e.target.value)}
                       placeholder="Contoh: 0812345678"
-                      className="block w-full mt-1.5 rounded-xl border border-zinc-850 bg-zinc-900 py-2.5 px-3.5 text-sm text-white focus:border-[#d4af37] outline-none"
+                      className="block w-full mt-1.5 rounded-xl border border-zinc-300 bg-white py-2.5 px-3.5 text-sm text-zinc-800 focus:border-[#d9a425] outline-none"
                     />
                   </div>
                 </div>
               </div>
 
               <div>
-                <label className="block text-xs font-bold uppercase tracking-wider text-zinc-400">Foto Profil Anak</label>
+                <label className="block text-xs font-bold uppercase tracking-wider text-zinc-500">Foto Profil Anak</label>
                 <div className="relative mt-1.5">
-                  <input 
-                    type="file" 
+                  <input
+                    type="file"
                     accept="image/*"
                     onChange={(e) => setPhotoFile(e.target.files?.[0] || null)}
                     className="peer absolute inset-0 h-full w-full opacity-0 cursor-pointer"
                   />
-                  <div className="rounded-xl border border-dashed border-zinc-800 bg-zinc-900/40 hover:bg-zinc-900 flex items-center justify-center gap-2 py-2.5 text-xs text-zinc-400 font-semibold transition-all">
-                    <Upload className="h-4 w-4 text-[#d4af37]" /> 
+                  <div className="rounded-xl border border-dashed border-zinc-200 bg-zinc-50 hover:bg-zinc-100 flex items-center justify-center gap-2 py-2.5 text-xs text-zinc-500 font-semibold transition-all">
+                    <Upload className="h-4 w-4 text-[#d9a425]" />
                     <span className="truncate max-w-[150px]">
                       {photoFile ? photoFile.name : 'Upload Foto'}
                     </span>
@@ -627,18 +686,18 @@ export default function StudentsList() {
                 </div>
               </div>
 
-              <div className="flex justify-end gap-3 pt-4 border-t border-zinc-900">
-                <button 
+              <div className="flex justify-end gap-3 pt-4 border-t border-zinc-150">
+                <button
                   type="button"
                   onClick={() => setShowModal(false)}
-                  className="rounded-xl border border-zinc-800 px-4 py-2.5 text-xs font-bold text-zinc-400 hover:text-white"
+                  className="rounded-xl border border-zinc-350 px-4 py-2.5 text-xs font-bold text-zinc-500 hover:bg-zinc-50 transition-colors"
                 >
                   Batal
                 </button>
-                <button 
+                <button
                   type="submit"
                   disabled={submitting}
-                  className="rounded-xl bg-[#d4af37] hover:bg-[#f3cb65] px-6 py-2.5 text-xs font-bold text-black flex items-center gap-1.5 transition-colors disabled:opacity-50"
+                  className="rounded-xl bg-[#d9a425] hover:bg-[#e5c158] px-6 py-2.5 text-xs font-bold text-black flex items-center gap-1.5 transition-colors disabled:opacity-50"
                 >
                   {submitting && <Loader2 className="h-3.5 w-3.5 animate-spin" />}
                   Simpan Data

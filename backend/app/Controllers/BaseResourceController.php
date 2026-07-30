@@ -16,13 +16,13 @@ abstract class BaseResourceController extends ResourceController
      */
     protected function getRequestParams(): array
     {
-        $page = (int) ($this->request->getVar('page') ?? 1);
-        $perPage = (int) ($this->request->getVar('per_page') ?? 10);
+        $page = max(1, (int) ($this->request->getVar('page') ?? 1));
+        $perPage = min(500, max(1, (int) ($this->request->getVar('per_page') ?? 10)));
         $sortField = $this->request->getVar('sort_by') ?? null;
         $sortOrder = $this->request->getVar('sort_order') ?? 'DESC';
         
         $sortBy = [];
-        if ($sortField) {
+        if ($sortField && preg_match('/^[a-zA-Z_][a-zA-Z0-9_]*$/', $sortField)) {
             $sortBy[$sortField] = strtoupper($sortOrder) === 'ASC' ? 'ASC' : 'DESC';
         }
 

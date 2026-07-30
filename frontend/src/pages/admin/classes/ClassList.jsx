@@ -106,19 +106,18 @@ export default function ClassList() {
     setSubmitting(true);
     setMessage(null);
 
-    // Use URL SearchParams or JSON for posting since ClassController reads getPost()
-    // CodeIgniter getPost() is populated on standard FormData posts
-    const formData = new FormData();
-    formData.append('name', name);
-    formData.append('age_group', ageGroup);
-    if (teacherId) formData.append('teacher_id', teacherId);
+    const payload = {
+      name: name,
+      age_group: ageGroup,
+      teacher_id: teacherId || null
+    };
 
     try {
       if (editingClass) {
-        await api.post(`/admin/classes/update/${editingClass.id}`, formData);
+        await api.post(`/admin/classes/update/${editingClass.id}`, payload);
         setMessage({ type: 'success', text: 'Kelas berhasil diperbarui!' });
       } else {
-        await api.post('/admin/classes', formData);
+        await api.post('/admin/classes', payload);
         setMessage({ type: 'success', text: 'Kelas baru berhasil dibuat!' });
       }
       setShowModal(false);
@@ -265,36 +264,36 @@ export default function ClassList() {
 
       {/* Class Form Modal */}
       {showModal && (
-        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/80 backdrop-blur-sm p-4">
-          <div className="w-full max-w-md rounded-2xl border border-zinc-850 bg-zinc-950 p-6 shadow-2xl space-y-6">
-            <div className="flex items-center justify-between border-b border-zinc-900 pb-3">
-              <h3 className="text-lg font-bold text-white">
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/60 backdrop-blur-sm p-4">
+          <div className="w-full max-w-md rounded-2xl border border-zinc-200 bg-white p-6 shadow-2xl space-y-6">
+            <div className="flex items-center justify-between border-b border-zinc-150 pb-3">
+              <h3 className="text-lg font-bold text-zinc-900">
                 {editingClass ? 'Edit Kelas Belajar' : 'Buat Kelas Baru'}
               </h3>
-              <button onClick={() => setShowModal(false)} className="text-zinc-400 hover:text-white">
+              <button onClick={() => setShowModal(false)} className="text-zinc-500 hover:text-zinc-950">
                 <X className="h-5 w-5" />
               </button>
             </div>
 
             <form onSubmit={handleSubmit} className="space-y-4">
               <div>
-                <label className="block text-xs font-bold uppercase tracking-wider text-zinc-400">Nama Kelas / Rombel</label>
+                <label className="block text-xs font-bold uppercase tracking-wider text-zinc-650">Nama Kelas / Rombel</label>
                 <input 
                   type="text" 
                   required
                   value={name}
                   onChange={(e) => setName(e.target.value)}
                   placeholder="Contoh: Kelas Anggrek"
-                  className="block w-full mt-1.5 rounded-xl border border-zinc-850 bg-zinc-900 py-2.5 px-3.5 text-sm text-white focus:border-[#d4af37] focus:ring-1 focus:ring-[#d4af37]/20 outline-none"
+                  className="block w-full mt-1.5 rounded-xl border border-zinc-300 bg-white py-2.5 px-3.5 text-sm text-zinc-900 focus:border-[#d4af37] focus:ring-1 focus:ring-[#d4af37]/20 outline-none"
                 />
               </div>
 
               <div>
-                <label className="block text-xs font-bold uppercase tracking-wider text-zinc-400">Kelompok Usia</label>
+                <label className="block text-xs font-bold uppercase tracking-wider text-zinc-650">Kelompok Usia</label>
                 <select 
                   value={ageGroup}
                   onChange={(e) => setAgeGroup(e.target.value)}
-                  className="block w-full mt-1.5 rounded-xl border border-zinc-850 bg-zinc-900 py-2.5 px-3.5 text-sm text-white focus:border-[#d4af37] outline-none"
+                  className="block w-full mt-1.5 rounded-xl border border-zinc-300 bg-white py-2.5 px-3.5 text-sm text-zinc-900 focus:border-[#d4af37] outline-none"
                 >
                   <option value="2-3_years">Kelompok Bermain A (2-3 Tahun)</option>
                   <option value="3-4_years">Kelompok Bermain B (3-4 Tahun)</option>
@@ -303,11 +302,11 @@ export default function ClassList() {
               </div>
 
               <div>
-                <label className="block text-xs font-bold uppercase tracking-wider text-zinc-400">Wali Kelas (Guru)</label>
+                <label className="block text-xs font-bold uppercase tracking-wider text-zinc-650">Wali Kelas (Guru)</label>
                 <select 
                   value={teacherId}
                   onChange={(e) => setTeacherId(e.target.value)}
-                  className="block w-full mt-1.5 rounded-xl border border-zinc-850 bg-zinc-900 py-2.5 px-3.5 text-sm text-white focus:border-[#d4af37] outline-none"
+                  className="block w-full mt-1.5 rounded-xl border border-zinc-300 bg-white py-2.5 px-3.5 text-sm text-zinc-900 focus:border-[#d4af37] outline-none"
                 >
                   <option value="">-- Pilih Guru Wali Kelas --</option>
                   {teachers.map((t) => (
@@ -316,11 +315,11 @@ export default function ClassList() {
                 </select>
               </div>
 
-              <div className="flex justify-end gap-3 pt-4 border-t border-zinc-900">
+              <div className="flex justify-end gap-3 pt-4 border-t border-zinc-150">
                 <button 
                   type="button"
                   onClick={() => setShowModal(false)}
-                  className="rounded-xl border border-zinc-800 px-4 py-2.5 text-xs font-bold text-zinc-400 hover:text-white"
+                  className="rounded-xl border border-zinc-200 px-4 py-2.5 text-xs font-bold text-zinc-500 hover:text-zinc-950 hover:bg-zinc-50 transition-colors"
                 >
                   Batal
                 </button>

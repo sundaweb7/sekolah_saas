@@ -25,13 +25,20 @@ class SemesterController extends BaseResourceController
     }
 
     /**
-     * POST /api/v1/admin/semesters
+     * POST /api/v1/admin/semesters/save
      */
-    public function create(): ResponseInterface
+    public function save(): ResponseInterface
     {
-        $academicYearId = $this->request->getVar('academic_year_id');
-        $name = $this->request->getVar('name'); // Ganjil / Genap
-        $status = $this->request->getVar('status') ?? 'inactive';
+        $schoolId = defined('CURRENT_SCHOOL_ID') ? CURRENT_SCHOOL_ID : null;
+        if (!$schoolId) {
+            return $this->respondError('School context required', ResponseInterface::HTTP_BAD_REQUEST);
+        }
+
+        $body = $this->getRequestBody();
+        $id = $body['id'] ?? null;
+        $academicYearId = $body['academic_year_id'] ?? null;
+        $name = $body['name'] ?? null;
+        $status = $body['status'] ?? 'inactive';
 
         if (empty($academicYearId) || empty($name)) {
             return $this->respondError('Academic Year ID and Semester Name are required', ResponseInterface::HTTP_BAD_REQUEST);
@@ -42,57 +49,29 @@ class SemesterController extends BaseResourceController
 
         if ($status === 'active') {
             // Deactivate all other semesters in this school
-            $this->semesterModel->where('status', 'active')->update(null, ['status' => 'inactive']);
+            $this->semesterModel->where('school_id', $schoolId)->update(null, ['status' => 'inactive']);
         }
 
-        $this->semesterModel->insert([
+        $data = [
+            'school_id'        => $schoolId,
             'academic_year_id' => $academicYearId,
             'name'             => $name,
             'status'           => $status
-        ]);
+        ];
 
-        $db->transComplete();
-
-        if ($db->transStatus() === false) {
-            return $this->respondError('Failed to create semester', ResponseInterface::HTTP_INTERNAL_SERVER_ERROR);
+        if ($id) {
+            $existing = $this->semesterModel->where('school_id', $schoolId)->find($id);
+            if (!$existing) {
+                return $this->respondError('Semester not found', ResponseInterface::HTTP_NOT_FOUND);
+            }
+            $this->semesterModel->update($id, $data);
+            $db->transComplete();
+            return $this->respondSuccess(null, 'Semester updated successfully');
+        } else {
+            $this->semesterModel->insert($data);
+            $db->transComplete();
+            return $this->respondSuccess(null, 'Semester created successfully');
         }
-
-        return $this->respondSuccess($this->semesterModel->find($this->semesterModel->getInsertID()), 'Semester created successfully', ResponseInterface::HTTP_CREATED);
-    }
-
-    /**
-     * POST /api/v1/admin/semesters/update/{id}
-     */
-    public function update($id = null): ResponseInterface
-    {
-        $semester = $this->semesterModel->find($id);
-        if (!$semester) {
-            return $this->respondError('Semester not found', ResponseInterface::HTTP_NOT_FOUND);
-        }
-
-        $status = $this->request->getVar('status');
-        $name = $this->request->getVar('name');
-
-        $data = [];
-        if ($name) $data['name'] = $name;
-        if ($status) $data['status'] = $status;
-
-        $db = \Config\Database::connect();
-        $db->transStart();
-
-        if (isset($data['status']) && $data['status'] === 'active') {
-            $this->semesterModel->where('status', 'active')->update(null, ['status' => 'inactive']);
-        }
-
-        $this->semesterModel->update($id, $data);
-
-        $db->transComplete();
-
-        if ($db->transStatus() === false) {
-            return $this->respondError('Failed to update semester', ResponseInterface::HTTP_INTERNAL_SERVER_ERROR);
-        }
-
-        return $this->respondSuccess($this->semesterModel->find($id), 'Semester updated successfully');
     }
 
     /**
@@ -100,7 +79,12 @@ class SemesterController extends BaseResourceController
      */
     public function delete($id = null): ResponseInterface
     {
-        $semester = $this->semesterModel->find($id);
+        $schoolId = defined('CURRENT_SCHOOL_ID') ? CURRENT_SCHOOL_ID : null;
+        if (!$schoolId) {
+            return $this->respondError('School context required', ResponseInterface::HTTP_BAD_REQUEST);
+        }
+
+        $semester = $this->semesterModel->where('school_id', $schoolId)->find($id);
         if (!$semester) {
             return $this->respondError('Semester not found', ResponseInterface::HTTP_NOT_FOUND);
         }

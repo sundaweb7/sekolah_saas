@@ -27,12 +27,16 @@ class PaymentCallbackController extends BaseResourceController
             return $this->respondError('Empty payload', ResponseInterface::HTTP_BAD_REQUEST);
         }
 
-        // Validate Signature if private key is configured
-        if (!empty($privateKey)) {
-            $localSignature = hash_hmac('sha256', $json, $privateKey);
-            if ($callbackSignature !== $localSignature) {
-                return $this->respondError('Invalid signature', ResponseInterface::HTTP_UNAUTHORIZED);
-            }
+        // Payment callbacks must fail closed. Accepting unsigned callbacks
+        // would allow anyone to mark an invoice as paid.
+        if (empty($privateKey)) {
+            log_message('critical', 'Tripay callback rejected: TRIPAY_PRIVATE_KEY is not configured.');
+            return $this->respondError('Payment callback is not configured', ResponseInterface::HTTP_SERVICE_UNAVAILABLE);
+        }
+
+        $localSignature = hash_hmac('sha256', $json, $privateKey);
+        if (empty($callbackSignature) || !hash_equals($localSignature, $callbackSignature)) {
+            return $this->respondError('Invalid signature', ResponseInterface::HTTP_UNAUTHORIZED);
         }
 
         // Parse payload
@@ -67,6 +71,14 @@ class PaymentCallbackController extends BaseResourceController
             return $this->respondError('Invoice not found', ResponseInterface::HTTP_NOT_FOUND);
         }
 
+        if (!empty($invoice->tripay_reference) && !hash_equals((string) $invoice->tripay_reference, (string) $reference)) {
+            return $this->respondError('Payment reference does not match invoice', ResponseInterface::HTTP_BAD_REQUEST);
+        }
+        $paidAmount = $data['total_amount'] ?? $data['amount'] ?? null;
+        if ($paidAmount === null || (int) $paidAmount !== (int) $invoice->amount) {
+            return $this->respondError('Payment amount does not match invoice', ResponseInterface::HTTP_BAD_REQUEST);
+        }
+
         if ($invoice->status === 'paid') {
             return $this->respondSuccess(['status' => 'already_processed'], 'Invoice already marked as paid.');
         }
@@ -75,10 +87,22 @@ class PaymentCallbackController extends BaseResourceController
             $paymentMethod = $data['payment_method'] ?? 'Tripay Payment';
             $paidAt        = isset($data['paid_at']) ? date('Y-m-d H:i:s', $data['paid_at']) : date('Y-m-d H:i:s');
 
-            $sppInvoiceModel->update($invoice->id, [
+            $sppInvoiceModel->where('id', $invoice->id)->where('status !=', 'paid')->set([
                 'status'         => 'paid',
                 'payment_method' => $paymentMethod,
                 'paid_at'        => $paidAt
+            ])->update();
+            if (\Config\Database::connect()->affectedRows() !== 1) {
+                return $this->respondSuccess(['status' => 'already_processed'], 'Invoice already marked as paid.');
+            }
+            (new \App\Models\AuditLogModel())->insert([
+                'school_id' => $invoice->school_id,
+                'role' => 'payment_gateway',
+                'action' => 'payment:spp:paid',
+                'method' => 'WEBHOOK',
+                'path' => 'payment/tripay-callback',
+                'status_code' => 200,
+                'created_at' => date('Y-m-d H:i:s'),
             ]);
 
             return $this->respondSuccess(['status' => 'updated'], 'Payment received and invoice updated.');

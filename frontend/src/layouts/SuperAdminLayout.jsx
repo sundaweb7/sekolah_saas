@@ -40,21 +40,15 @@ export default function SuperAdminLayout({ children, activeTab, setActiveTab }) 
     <div className="min-h-screen bg-[#f3f7f9] text-zinc-800 flex font-sans admin-portal-theme">
       
       {/* Sidebar Drawer */}
-      <aside className={`fixed inset-y-0 left-0 z-50 w-64 bg-[#ebf3f6] border-r border-zinc-200/80 transition-transform duration-300 transform lg:translate-x-0 lg:static lg:flex flex-col justify-between ${sidebarOpen ? 'translate-x-0' : '-translate-x-full'}`}>
+      <aside className={`fixed inset-y-0 left-0 z-50 w-64 bg-zinc-950 border-r border-[#d9a425]/15 transition-transform duration-300 transform lg:translate-x-0 lg:sticky lg:top-0 lg:h-screen flex flex-col justify-between ${sidebarOpen ? 'translate-x-0' : '-translate-x-full'}`}>
         
         {/* Top Header Section */}
         <div>
-          <div className="h-16 flex items-center justify-between px-6 border-b border-zinc-200 bg-white">
+          <div className="h-16 flex items-center justify-between px-6 border-b border-[#d9a425]/15 bg-zinc-950">
             <div className="flex items-center gap-2.5">
-              <div className="h-8 w-8 rounded-lg bg-gradient-to-br from-indigo-600 to-indigo-800 flex items-center justify-center font-bold text-white text-sm shadow-md">
-                SA
-              </div>
-              <div className="min-w-0">
-                <p className="font-extrabold text-sm text-zinc-900 truncate leading-tight">PAUDKU PUSAT</p>
-                <p className="text-[10px] font-bold tracking-wider text-indigo-600 uppercase mt-0.5">Super Admin</p>
-              </div>
+              <img src="/koola.png" className="h-9 w-auto object-contain" alt="koola Logo" />
             </div>
-            <button className="lg:hidden text-zinc-550 hover:text-zinc-800" onClick={() => setSidebarOpen(false)}>
+            <button className="lg:hidden text-zinc-400 hover:text-white" onClick={() => setSidebarOpen(false)}>
               <X className="h-5 w-5" />
             </button>
           </div>
@@ -67,15 +61,15 @@ export default function SuperAdminLayout({ children, activeTab, setActiveTab }) 
                 <button
                   key={item.id}
                   onClick={() => setActiveTab(item.id)}
-                  className={`w-full flex items-center justify-between px-4 py-2.5 rounded-xl text-sm font-semibold transition-all group ${isActive ? 'bg-white text-zinc-900 shadow-sm border-l-4 border-indigo-600' : 'text-zinc-650 hover:text-zinc-900 hover:bg-white/40'}`}
+                  className={`w-full flex items-center justify-between px-4 py-2.5 rounded-xl text-sm font-semibold transition-all group ${isActive ? 'bg-[#d9a425] text-zinc-950 shadow-md shadow-[#d9a425]/10' : 'text-zinc-400 hover:text-white hover:bg-white/5'}`}
                 >
                   <div className="flex items-center gap-3.5">
-                    <span className={isActive ? 'text-indigo-600' : 'text-zinc-455 group-hover:text-zinc-800 transition-colors'}>
+                    <span className={isActive ? 'text-zinc-950' : 'text-zinc-400 group-hover:text-[#d9a425] transition-colors'}>
                       {item.icon}
                     </span>
                     <span>{item.label}</span>
                   </div>
-                  {isActive && <ChevronRight className="h-4 w-4 text-indigo-600" />}
+                  {isActive && <ChevronRight className="h-4 w-4 text-zinc-950" />}
                 </button>
               );
             })}
@@ -83,19 +77,19 @@ export default function SuperAdminLayout({ children, activeTab, setActiveTab }) 
         </div>
   
         {/* Bottom User Profile Section */}
-        <div className="p-4 border-t border-zinc-200 bg-white/40">
+        <div className="p-4 border-t border-zinc-900 bg-zinc-950/40">
           <div className="flex items-center gap-3 mb-4">
-            <div className="h-9 w-9 rounded-full bg-indigo-550/10 flex items-center justify-center text-xs font-bold text-indigo-600 uppercase border border-indigo-200">
+            <div className="h-9 w-9 rounded-full bg-zinc-900 flex items-center justify-center text-xs font-bold text-[#d9a425] uppercase border border-zinc-800">
               <Shield className="h-4.5 w-4.5" />
             </div>
             <div className="min-w-0">
-              <p className="font-bold text-xs text-zinc-800">{user?.full_name || 'Super Admin'}</p>
-              <p className="text-[10px] text-zinc-550 truncate">SaaS Owner</p>
+              <p className="font-bold text-xs text-zinc-200">{user?.full_name || 'Super Admin'}</p>
+              <p className="text-[10px] text-zinc-555 truncate">SaaS Owner</p>
             </div>
           </div>
           <button 
             onClick={logout}
-            className="w-full flex items-center justify-center gap-2 rounded-xl border border-zinc-200 bg-white hover:bg-red-50 hover:text-red-650 py-2.5 text-xs font-bold text-zinc-700 transition-all shadow-sm"
+            className="w-full flex items-center justify-center gap-2 rounded-xl border border-zinc-900 bg-zinc-900 hover:bg-red-950/30 hover:text-red-400 hover:border-red-900/30 py-2.5 text-xs font-bold text-zinc-400 transition-all shadow-sm"
           >
             <LogOut className="h-4 w-4" /> Keluar dari Sistem
           </button>

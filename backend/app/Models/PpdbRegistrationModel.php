@@ -13,7 +13,7 @@ class PpdbRegistrationModel extends BaseModel
     protected $allowedFields    = [
         'school_id', 'registration_number', 'full_name', 'birth_date', 
         'gender', 'parent_name', 'parent_phone', 'document_files', 
-        'status', 'payment_status', 'admin_notes'
+        'status', 'payment_status', 'admin_notes', 'privacy_consent_at', 'privacy_version'
     ];
 
     // Dates
@@ -27,7 +27,7 @@ class PpdbRegistrationModel extends BaseModel
     protected $beforeInsert = ['setSchoolId', 'generateRegistrationNumber'];
 
     /**
-     * Generate registration number in format PPDB-{YEAR}-{5_DIGIT_AUTO_INCREMENT}
+     * Generate a non-sequential, tenant-aware public tracking number.
      */
     protected function generateRegistrationNumber(array $data)
     {
@@ -38,15 +38,8 @@ class PpdbRegistrationModel extends BaseModel
 
         $year = date('Y');
         
-        // Count previous registrations for this school in this year
-        $count = $this->where('school_id', $schoolId)
-                      ->like('registration_number', 'PPDB-' . $year . '-')
-                      ->withDeleted() // include deleted to prevent number duplication
-                      ->countAllResults();
-
-        $increment = str_pad($count + 1, 5, '0', STR_PAD_LEFT);
-        
-        $data['data']['registration_number'] = "PPDB-{$year}-{$increment}";
+        $random = strtoupper(bin2hex(random_bytes(4)));
+        $data['data']['registration_number'] = "PPDB-{$year}-{$schoolId}-{$random}";
 
         return $data;
     }

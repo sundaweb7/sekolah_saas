@@ -7,7 +7,7 @@ import { useNavigate, useSearchParams } from 'react-router-dom';
 import { Lock, AlertTriangle, CheckCircle, Loader2 } from 'lucide-react';
 
 const resetPasswordSchema = z.object({
-  password: z.string().min(6, { message: 'Kata sandi minimal 6 karakter' }),
+  password: z.string().min(8, { message: 'Kata sandi minimal 8 karakter' }),
   confirmPassword: z.string(),
 }).refine((data) => data.password === data.confirmPassword, {
   message: 'Konfirmasi kata sandi tidak cocok',

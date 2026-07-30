@@ -42,6 +42,9 @@ class UserController extends BaseResourceController
         if (empty($data['email']) || empty($data['password']) || empty($data['role']) || empty($data['full_name'])) {
             return $this->respondError('Semua kolom wajib diisi.', ResponseInterface::HTTP_BAD_REQUEST);
         }
+        if (!in_array($data['role'], ['admin', 'teacher', 'parent'], true)) {
+            return $this->respondError('Role tidak diizinkan.', ResponseInterface::HTTP_BAD_REQUEST);
+        }
 
         // Check if email already exists
         $existing = $this->userModel->where('email', $data['email'])->first();
@@ -49,7 +52,10 @@ class UserController extends BaseResourceController
             return $this->respondError('Alamat email sudah terdaftar.', ResponseInterface::HTTP_BAD_REQUEST);
         }
 
-        $data['password_hash'] = password_hash($data['password'], PASSWORD_BCRYPT);
+        if (strlen($data['password']) < 8) {
+            return $this->respondError('Password minimal 8 karakter.', ResponseInterface::HTTP_BAD_REQUEST);
+        }
+        $data['password_hash'] = $data['password'];
         unset($data['password']);
         $data['status'] = 'active';
 
@@ -75,9 +81,15 @@ class UserController extends BaseResourceController
         if (!$user) {
             return $this->respondError('User tidak ditemukan.', ResponseInterface::HTTP_NOT_FOUND);
         }
+        if (isset($data['role']) && !in_array($data['role'], ['admin', 'teacher', 'parent'], true)) {
+            return $this->respondError('Role tidak diizinkan.', ResponseInterface::HTTP_BAD_REQUEST);
+        }
 
         if (!empty($data['password'])) {
-            $data['password_hash'] = password_hash($data['password'], PASSWORD_BCRYPT);
+            if (strlen($data['password']) < 8) {
+                return $this->respondError('Password minimal 8 karakter.', ResponseInterface::HTTP_BAD_REQUEST);
+            }
+            $data['password_hash'] = $data['password'];
         }
         unset($data['password']);
 

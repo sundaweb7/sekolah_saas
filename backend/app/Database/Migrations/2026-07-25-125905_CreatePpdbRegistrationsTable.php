@@ -62,6 +62,8 @@ class CreatePpdbRegistrationsTable extends Migration
                 'type' => 'TEXT',
                 'null' => true,
             ],
+            'privacy_consent_at' => ['type' => 'DATETIME', 'null' => true],
+            'privacy_version' => ['type' => 'VARCHAR', 'constraint' => 30, 'null' => true],
             'created_at' => [
                 'type' => 'DATETIME',
                 'null' => true,

@@ -6,6 +6,7 @@ import * as z from 'zod';
 import api from '../../config/axios';
 import TenantWebsiteLayout from '../../layouts/TenantWebsiteLayout';
 import { User, Phone, CheckCircle, FileText, Upload, AlertCircle, Loader2 } from 'lucide-react';
+import { tenantHeaders } from '../../utils/tenant';
 
 const registrationSchema = z.object({
   fullName: z.string().min(3, { message: 'Nama lengkap minimal 3 karakter' }),
@@ -13,6 +14,7 @@ const registrationSchema = z.object({
   gender: z.enum(['L', 'P'], { message: 'Pilih jenis kelamin' }),
   parentName: z.string().min(3, { message: 'Nama orang tua/wali wajib diisi' }),
   parentPhone: z.string().min(10, { message: 'Nomor telepon minimal 10 digit' }),
+  consent: z.literal(true, { message: 'Persetujuan pemrosesan data wajib diberikan' }),
 });
 
 export default function PpdbRegistrationForm() {
@@ -36,15 +38,8 @@ export default function PpdbRegistrationForm() {
   useEffect(() => {
     const fetchSettings = async () => {
       try {
-        const host = window.location.hostname;
-        let subdomain = host.split('.')[0];
-        if (subdomain === 'localhost' || subdomain === '127') {
-          subdomain = schoolSlug || 'tkmelati';
-        }
         const response = await api.get('/ppdb/settings', {
-          headers: {
-            'X-School-ID': subdomain === 'tkmelati' ? '1' : localStorage.getItem('school_id') || '1'
-          }
+          headers: tenantHeaders(schoolSlug),
         });
         setSettings(response.data);
       } catch (err) {
@@ -66,21 +61,16 @@ export default function PpdbRegistrationForm() {
     formData.append('gender', data.gender);
     formData.append('parent_name', data.parentName);
     formData.append('parent_phone', data.parentPhone);
+    formData.append('privacy_consent', data.consent ? '1' : '0');
 
     if (aktaFile) formData.append('akta_kelahiran', aktaFile);
     if (kkFile) formData.append('kartu_keluarga', kkFile);
 
     try {
-      const host = window.location.hostname;
-      let subdomain = host.split('.')[0];
-      if (subdomain === 'localhost' || subdomain === '127') {
-        subdomain = schoolSlug || 'tkmelati';
-      }
-
       const response = await api.post('/ppdb/register', formData, {
         headers: { 
           'Content-Type': 'multipart/form-data',
-          'X-School-ID': subdomain === 'tkmelati' ? '1' : localStorage.getItem('school_id') || '1'
+          ...tenantHeaders(schoolSlug),
         }
       });
       setSuccessData(response.data);
@@ -263,6 +253,11 @@ export default function PpdbRegistrationForm() {
               </div>
 
               <div className="pt-6 border-t border-zinc-800/80">
+                <label className="mb-4 flex items-start gap-3 text-xs text-zinc-400">
+                  <input {...register('consent')} type="checkbox" className="mt-0.5" />
+                  <span>Saya adalah orang tua/wali yang berwenang dan menyetujui pemrosesan data untuk keperluan PPDB sesuai <Link to="/privacy" className="text-indigo-400 underline">kebijakan privasi</Link>.</span>
+                </label>
+                {errors.consent && <p className="mb-3 text-xs text-red-400">{errors.consent.message}</p>}
                 <button
                   type="submit"
                   disabled={isSubmitting}

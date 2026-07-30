@@ -25,6 +25,9 @@ class CreateSubscriptionsTable extends Migration
                 'constraint' => ['basic', 'standard', 'premium'],
                 'default'    => 'basic',
             ],
+            'billing_cycle' => [
+                'type' => 'VARCHAR', 'constraint' => 20, 'default' => 'monthly',
+            ],
             'start_date' => [
                 'type' => 'DATE',
             ],

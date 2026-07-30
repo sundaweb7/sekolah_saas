@@ -3,6 +3,7 @@ import { useParams, useSearchParams, Link } from 'react-router-dom';
 import api from '../../config/axios';
 import TenantWebsiteLayout from '../../layouts/TenantWebsiteLayout';
 import { Search, Printer, AlertTriangle, FileText, CheckCircle2, Loader2, ArrowLeft } from 'lucide-react';
+import { tenantHeaders } from '../../utils/tenant';
 
 export default function PpdbStatusTracker() {
   const { schoolSlug } = useParams();
@@ -17,15 +18,8 @@ export default function PpdbStatusTracker() {
     setLoading(true);
     setError(null);
     try {
-      const host = window.location.hostname;
-      let subdomain = host.split('.')[0];
-      if (subdomain === 'localhost' || subdomain === '127') {
-        subdomain = schoolSlug || 'tkmelati';
-      }
       const response = await api.get(`/ppdb/status/${numberToQuery}`, {
-        headers: {
-          'X-School-ID': subdomain === 'tkmelati' ? '1' : localStorage.getItem('school_id') || '1'
-        }
+        headers: tenantHeaders(schoolSlug),
       });
       setData(response.data);
     } catch (err) {

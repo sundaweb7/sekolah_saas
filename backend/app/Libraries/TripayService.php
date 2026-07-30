@@ -10,12 +10,12 @@ class TripayService
     protected bool $isSandbox;
     protected string $baseUrl;
 
-    public function __construct()
+    public function __construct(?array $config = null)
     {
-        $this->apiKey       = env('TRIPAY_API_KEY', '');
-        $this->privateKey   = env('TRIPAY_PRIVATE_KEY', '');
-        $this->merchantCode = env('TRIPAY_MERCHANT_CODE', '');
-        $this->isSandbox    = (bool) env('TRIPAY_IS_SANDBOX', true);
+        $this->apiKey       = $config['api_key'] ?? env('TRIPAY_API_KEY', '');
+        $this->privateKey   = $config['private_key'] ?? env('TRIPAY_PRIVATE_KEY', '');
+        $this->merchantCode = $config['merchant_code'] ?? env('TRIPAY_MERCHANT_CODE', '');
+        $this->isSandbox    = (bool) ($config['is_sandbox'] ?? env('TRIPAY_IS_SANDBOX', true));
 
         $this->baseUrl = $this->isSandbox 
             ? 'https://tripay.co.id/api-sandbox/' 
@@ -28,7 +28,10 @@ class TripayService
     public function createClosedTransaction(array $params): array
     {
         if (empty($this->apiKey) || empty($this->privateKey) || empty($this->merchantCode)) {
-            // If credentials are placeholder or empty, fallback to a dummy sandbox response to prevent crash
+            if (ENVIRONMENT === 'production') {
+                throw new \RuntimeException('Tripay credentials are not configured.');
+            }
+            // Development-only response for local UI testing.
             return [
                 'success' => true,
                 'data' => [
@@ -38,6 +41,7 @@ class TripayService
                     'payment_name'   => str_replace('Virtual Account ', '', $params['method']) . ' Transfer',
                     'amount'         => $params['amount'],
                     'pay_code'       => '98801234567890', // dummy payment code / VA
+                    'checkout_url'   => null,
                     'status'         => 'UNPAID',
                     'instructions'   => [
                         [
@@ -106,17 +110,59 @@ class TripayService
     }
 
     /**
+     * Compatibility entry point used by subscription billing.
+     */
+    public function createPayment(
+        string $merchantRef,
+        int $amount,
+        string $itemName,
+        string $paymentMethod,
+        array $customer = []
+    ): array {
+        return $this->createClosedTransaction([
+            'merchant_ref' => $merchantRef,
+            'amount' => $amount,
+            'item_name' => $itemName,
+            'method' => $paymentMethod,
+            'customer_name' => $customer['name'] ?? 'Admin Sekolah',
+            'customer_email' => $customer['email'] ?? 'admin@school.sch.id',
+        ]);
+    }
+
+    /**
+     * Verify that a callback was signed by Tripay.
+     */
+    public function verifyCallbackSignature(string $json, string $receivedSignature): bool
+    {
+        if ($this->privateKey === '' || $receivedSignature === '') {
+            return false;
+        }
+
+        $localSignature = hash_hmac('sha256', $json, $this->privateKey);
+        return hash_equals($localSignature, $receivedSignature);
+    }
+
+    /**
      * Map friendly payment method names to Tripay method codes
      */
     private function mapPaymentMethod(string $friendlyName): string
     {
-        switch ($friendlyName) {
-            case 'Virtual Account Mandiri': return 'MANDIRIVA';
-            case 'Virtual Account BCA':     return 'BCAVA';
-            case 'Virtual Account BNI':     return 'BNIVA';
-            case 'Virtual Account BRI':     return 'BRIVA';
-            case 'Gopay / QRIS':            return 'QRIS';
-            default:                        return 'QRIS';
+        $name = strtolower($friendlyName);
+        if (str_contains($name, 'mandiri')) {
+            return 'MANDIRIVA';
         }
+        if (str_contains($name, 'bca')) {
+            return 'BCAVA';
+        }
+        if (str_contains($name, 'bni')) {
+            return 'BNIVA';
+        }
+        if (str_contains($name, 'bri')) {
+            return 'BRIVA';
+        }
+        if (str_contains($name, 'qris') || str_contains($name, 'gopay')) {
+            return 'QRIS';
+        }
+        return 'QRIS';
     }
 }

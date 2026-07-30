@@ -26,6 +26,54 @@ class AcademicYearController extends BaseResourceController
     }
 
     /**
+     * POST /api/v1/admin/academic-years/save
+     */
+    public function save(): ResponseInterface
+    {
+        $schoolId = defined('CURRENT_SCHOOL_ID') ? CURRENT_SCHOOL_ID : null;
+        if (!$schoolId) {
+            return $this->respondError('School context required', ResponseInterface::HTTP_BAD_REQUEST);
+        }
+
+        $body = $this->getRequestBody();
+        $id = $body['id'] ?? null;
+        $name = $body['name'] ?? null;
+        $status = $body['status'] ?? 'inactive';
+
+        if (empty($name)) {
+            return $this->respondError('Academic Year Name is required', ResponseInterface::HTTP_BAD_REQUEST);
+        }
+
+        $db = \Config\Database::connect();
+        $db->transStart();
+
+        if ($status === 'active') {
+            // Deactivate all other academic years in this school
+            $this->academicYearModel->where('school_id', $schoolId)->update(null, ['status' => 'inactive']);
+        }
+
+        $data = [
+            'school_id' => $schoolId,
+            'name'      => $name,
+            'status'    => $status
+        ];
+
+        if ($id) {
+            $existing = $this->academicYearModel->where('school_id', $schoolId)->find($id);
+            if (!$existing) {
+                return $this->respondError('Academic year not found', ResponseInterface::HTTP_NOT_FOUND);
+            }
+            $this->academicYearModel->update($id, $data);
+            $db->transComplete();
+            return $this->respondSuccess(null, 'Academic year updated successfully');
+        } else {
+            $this->academicYearModel->insert($data);
+            $db->transComplete();
+            return $this->respondSuccess(null, 'Academic year created successfully');
+        }
+    }
+
+    /**
      * POST /api/v1/admin/academic-years
      */
     public function create(): ResponseInterface

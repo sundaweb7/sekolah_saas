@@ -1,4 +1,5 @@
 import axios from 'axios';
+import { getTenantHeader } from '../utils/tenant';
 
 // Strip subdomain to get the backend base host
 // e.g. tkmelati.localhost → localhost, sub.paudku.id → paudku.id
@@ -38,10 +39,10 @@ api.interceptors.request.use(
       config.headers.Authorization = `Bearer ${token}`;
     }
 
-    // Set Tenant context header if exists (for API multi-tenancy resolve)
-    const schoolId = localStorage.getItem('school_id');
-    if (schoolId) {
-      config.headers['X-School-ID'] = schoolId;
+    // Use the URL tenant, never a stale tenant ID from browser storage.
+    if (!config.headers['X-School-ID']) {
+      const tenant = getTenantHeader();
+      if (tenant) config.headers['X-School-ID'] = tenant;
     }
 
     return config;
@@ -58,6 +59,8 @@ api.interceptors.response.use(
     // Session expired
     if (error.response && error.response.status === 401) {
       sessionStorage.removeItem('access_token');
+      sessionStorage.removeItem('refresh_token');
+      sessionStorage.removeItem('school_id');
       localStorage.removeItem('refresh_token');
       localStorage.removeItem('school_id');
       window.location.href = '/login';

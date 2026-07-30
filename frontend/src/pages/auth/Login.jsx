@@ -9,7 +9,7 @@ import { KeyRound, Mail, AlertTriangle, Eye, EyeOff, Loader2, Globe, Building, C
 
 const loginSchema = z.object({
   email: z.string().email({ message: 'Alamat email tidak valid' }),
-  password: z.string().min(6, { message: 'Kata sandi minimal 6 karakter' }),
+  password: z.string().min(1, { message: 'Kata sandi wajib diisi' }),
   rememberMe: z.boolean().optional()
 });
 
@@ -20,7 +20,8 @@ const registerSchema = z.object({
   admin_name: z.string().min(3, { message: 'Nama admin/kepala sekolah wajib diisi' }),
   phone: z.string().min(10, { message: 'Nomor WhatsApp minimal 10 digit' }),
   email: z.string().email({ message: 'Alamat email tidak valid' }),
-  password: z.string().min(6, { message: 'Kata sandi minimal 6 karakter' }),
+  password: z.string().min(8, { message: 'Kata sandi minimal 8 karakter' }),
+  level: z.enum(['TK', 'SD', 'SMP', 'SMA', 'MTS_MA', 'SMK', 'PESANTREN'], { required_error: 'Jenjang sekolah wajib dipilih' }),
 });
 
 const getBaseDomain = () => {
@@ -47,26 +48,15 @@ export default function Login() {
   useEffect(() => {
     setIsRegisterMode(searchParams.get('register') === 'true');
 
-    // Impersonate / SSO SSO auto login parameters
-    const ssoToken = searchParams.get('sso_token');
-    const ssoRefreshToken = searchParams.get('sso_refresh_token');
-    const ssoSchoolId = searchParams.get('sso_school_id');
-    const ssoRole = searchParams.get('sso_role');
-    
-    if (ssoToken && ssoRefreshToken) {
-      sessionStorage.setItem('access_token', ssoToken);
-      localStorage.setItem('refresh_token', ssoRefreshToken);
-      if (ssoSchoolId) {
-        localStorage.setItem('school_id', ssoSchoolId);
-      }
-      // Trigger a page reload or standard redirect to dashboard
-      if (ssoRole === 'admin') {
-        window.location.href = '/admin';
-      } else if (ssoRole === 'teacher') {
-        window.location.href = '/teacher';
-      } else {
-        window.location.href = '/parent';
-      }
+    const code = searchParams.get('impersonation_code');
+    if (code) {
+      window.history.replaceState({}, document.title, '/login');
+      api.post('/auth/impersonation/exchange', { code }).then(({ data }) => {
+        sessionStorage.setItem('access_token', data.access_token);
+        sessionStorage.setItem('refresh_token', data.refresh_token);
+        sessionStorage.setItem('school_id', data.user.school_id || '');
+        window.location.href = data.user.role === 'admin' ? '/admin' : data.user.role === 'teacher' ? '/teacher' : '/parent';
+      }).catch((err) => setError(err.message || 'Kode akses tidak valid atau sudah kedaluwarsa.'));
     }
   }, [searchParams, navigate]);
 
@@ -109,14 +99,22 @@ export default function Login() {
     }
   };
 
+  const [registeredTenant, setRegisteredTenant] = useState(null);
+
   const onRegisterSubmit = async (data) => {
     setError(null);
     setSuccess(null);
+    setRegisteredTenant(null);
     setRegistering(true);
 
     try {
       await api.post('/auth/register-tenant', data);
       setSuccess('Registrasi sekolah berhasil! Silakan masuk dengan akun Anda.');
+      setRegisteredTenant({
+        subdomain: data.subdomain,
+        email: data.email,
+        password: data.password
+      });
       setIsRegisterMode(false);
     } catch (err) {
       setError(err.message || 'Pendaftaran tenant gagal.');
@@ -131,11 +129,11 @@ export default function Login() {
         
         {/* Toggle Headings */}
         <div className="text-center">
-          <div className="mx-auto flex h-12 w-12 items-center justify-center rounded-full bg-indigo-500/10 text-indigo-400">
-            {isRegisterMode ? <Building className="h-6 w-6" /> : <KeyRound className="h-6 w-6" />}
+          <div className="mx-auto flex h-14 w-auto items-center justify-center">
+            <img src="/koola.png" className="h-12 w-auto object-contain" alt="koola Logo" />
           </div>
-          <h2 className="mt-6 text-3xl font-bold tracking-tight text-white">
-            {isRegisterMode ? 'Daftar Sekolah Baru' : 'Masuk ke PAUDKU'}
+          <h2 className="mt-4 text-3xl font-bold tracking-tight text-white">
+            {isRegisterMode ? 'Daftar Sekolah Baru' : 'Masuk ke koola'}
           </h2>
           <p className="mt-2 text-sm text-zinc-400 font-medium">
             {isRegisterMode ? 'Mulai buat website & sistem PPDB sekolah Anda' : 'Silakan masukkan kredensial akun Anda'}
@@ -151,9 +149,50 @@ export default function Login() {
         )}
 
         {success && (
-          <div className="flex items-center gap-3 rounded-lg border border-green-500/30 bg-green-500/10 p-4 text-sm text-green-400">
-            <CheckCircle2 className="h-5 w-5 shrink-0" />
-            <span>{success}</span>
+          <div className="space-y-4">
+            <div className="flex items-center gap-3 rounded-lg border border-green-500/30 bg-green-500/10 p-4 text-sm text-green-400">
+              <CheckCircle2 className="h-5 w-5 shrink-0" />
+              <span>{success}</span>
+            </div>
+
+            {registeredTenant && (
+              <div className="bg-zinc-950/80 border border-zinc-800 rounded-xl p-4.5 space-y-3.5 text-xs text-zinc-300">
+                <p className="font-extrabold text-[#d4af37] text-sm flex items-center gap-1.5 border-b border-zinc-850 pb-2">
+                  <span>ℹ️</span> Detail Akun Sekolah Baru
+                </p>
+                <div className="space-y-2">
+                  <div>
+                    <span className="text-zinc-500 font-bold block">Link Portal Login Sekolah:</span>
+                    <a
+                      href={`http://${registeredTenant.subdomain}.localhost:5173/login`}
+                      target="_blank"
+                      rel="noopener noreferrer"
+                      className="font-extrabold text-indigo-400 hover:text-indigo-300 underline font-mono break-all mt-0.5 block"
+                    >
+                      {`http://${registeredTenant.subdomain}.localhost:5173/login`}
+                    </a>
+                  </div>
+                  <div className="grid grid-cols-2 gap-3 pt-1">
+                    <div>
+                      <span className="text-zinc-500 font-bold block">Email Admin:</span>
+                      <span className="font-bold text-white break-all font-mono">{registeredTenant.email}</span>
+                    </div>
+                    <div>
+                      <span className="text-zinc-500 font-bold block">Kata Sandi:</span>
+                      <span className="font-bold text-white font-mono">{registeredTenant.password}</span>
+                    </div>
+                  </div>
+                </div>
+                <div className="pt-1.5">
+                  <a
+                    href={`http://${registeredTenant.subdomain}.localhost:5173/login`}
+                    className="w-full rounded-lg bg-[#d4af37] hover:bg-[#c29e2f] text-black font-extrabold py-2.5 px-4 text-center block transition-all shadow-md shadow-[#d4af37]/10"
+                  >
+                    Buka Portal Sekolah &amp; Masuk
+                  </a>
+                </div>
+              </div>
+            )}
           </div>
         )}
 

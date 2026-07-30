@@ -151,4 +151,26 @@ class PpdbAdminController extends BaseResourceController
 
         return $this->respondSuccess($this->registrationModel->find($id), 'Payment confirmed successfully');
     }
+
+    public function downloadDocument($id = null, $documentKey = null): ResponseInterface
+    {
+        if (!$id || !in_array($documentKey, ['akta_kelahiran', 'kartu_keluarga'], true)) {
+            return $this->respondError('Invalid document request', ResponseInterface::HTTP_BAD_REQUEST);
+        }
+
+        $registration = $this->registrationModel->find($id);
+        $documents = $registration ? json_decode($registration->document_files ?? '{}', true) : [];
+        $relative = $documents[$documentKey] ?? null;
+        if (!$relative) {
+            return $this->respondError('Document not found', ResponseInterface::HTTP_NOT_FOUND);
+        }
+
+        $base = realpath(WRITEPATH . 'uploads/ppdb');
+        $file = realpath(WRITEPATH . 'uploads/' . ltrim($relative, '/'));
+        if (!$base || !$file || !str_starts_with($file, $base . DIRECTORY_SEPARATOR) || !is_file($file)) {
+            return $this->respondError('Document not found', ResponseInterface::HTTP_NOT_FOUND);
+        }
+
+        return $this->response->download($file, null)->setFileName($documentKey . '-' . $registration->registration_number . '.' . pathinfo($file, PATHINFO_EXTENSION));
+    }
 }

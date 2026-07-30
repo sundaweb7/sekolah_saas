@@ -26,17 +26,17 @@ function getBackendBase() {
 
 const BACKEND_BASE = getBackendBase();
 
-function ModernTemplate({ 
-  school, settings, profile, news, events, announcements, gallery, teachers, 
-  schoolSlug, heroImage, principalPhoto, contactInfo, handleMessageSubmit, 
-  formName, setFormName, formMessage, setFormMessage, formSuccess 
+function ModernTemplate({
+  school, settings, profile, news, events, announcements, gallery, teachers,
+  schoolSlug, heroImage, principalPhoto, contactInfo, handleMessageSubmit,
+  formName, setFormName, formMessage, setFormMessage, formSuccess
 }) {
   const isLocalhost = window.location.hostname === 'localhost' || window.location.hostname === '127.0.0.1';
   const ppdbLink = isLocalhost ? `/school/${schoolSlug}/ppdb` : '/ppdb';
 
   return (
     <div className="w-full bg-[#fcfcfc] text-[#1a1a1a] selection:bg-zinc-950 selection:text-white" style={{ fontFamily: "'DM Sans', sans-serif" }}>
-      
+
       {/* Announcements Alert Bar */}
       {announcements.length > 0 && (
         <div className="bg-zinc-950 text-white py-3 px-6 border-b border-zinc-800">
@@ -65,14 +65,14 @@ function ModernTemplate({
             {profile?.hero_tagline || 'Mendidik anak usia dini dengan cinta, kreatifitas, dan akhlak mulia.'}
           </p>
           <div className="pt-6 flex flex-wrap justify-center gap-4">
-            <Link 
-              to={ppdbLink} 
+            <Link
+              to={ppdbLink}
               className="inline-flex items-center gap-2 rounded bg-white hover:bg-zinc-150 px-8 py-4 text-xs font-bold uppercase tracking-widest text-black transition-all shadow-xl"
             >
               Pendaftaran PPDB <ArrowRight className="h-4 w-4" />
             </Link>
-            <a 
-              href="#profil" 
+            <a
+              href="#profil"
               className="inline-flex items-center gap-2 rounded border border-white/20 hover:border-white/40 bg-white/5 backdrop-blur-md px-8 py-4 text-xs font-bold uppercase tracking-widest text-white transition-all"
             >
               Profil Sekolah
@@ -91,7 +91,7 @@ function ModernTemplate({
                 Membangun Generasi Unggul Sejak Usia Dini
               </h2>
             </div>
-            
+
             <div className="border-l-4 border-zinc-900 pl-6 py-1">
               <p className="text-sm text-zinc-500 leading-relaxed italic">
                 "{profile?.principal_welcome_message || 'Selamat datang di website resmi kami. Kami berkomitmen untuk membimbing tumbuh kembang anak didik dengan pola pengajaran aktif, kreatif, ceria, dan berkarakter mulia.'}"
@@ -123,11 +123,11 @@ function ModernTemplate({
           <div className="relative flex justify-center">
             {/* Minimalist modern frame */}
             <div className="w-full max-w-sm rounded-2xl overflow-hidden shadow-2xl border border-zinc-250 bg-white p-2">
-              <img 
-                src={principalPhoto} 
-                alt="Kepala Sekolah" 
-                className="w-full h-96 object-cover rounded-xl" 
-                loading="lazy" 
+              <img
+                src={principalPhoto}
+                alt="Kepala Sekolah"
+                className="w-full h-96 object-cover rounded-xl"
+                loading="lazy"
               />
             </div>
           </div>
@@ -182,10 +182,10 @@ function ModernTemplate({
             <div className="grid grid-cols-2 md:grid-cols-3 gap-6">
               {gallery.slice(0, 6).map((photo) => (
                 <div key={photo.id} className="group relative aspect-video rounded-xl overflow-hidden border border-zinc-200 bg-zinc-50">
-                  <img 
-                    src={`${BACKEND_BASE}/${photo.image}`} 
-                    alt={photo.title} 
-                    className="h-full w-full object-cover transition-transform duration-500 group-hover:scale-105" 
+                  <img
+                    src={`${BACKEND_BASE}/${photo.image}`}
+                    alt={photo.title}
+                    className="h-full w-full object-cover transition-transform duration-500 group-hover:scale-105"
                   />
                   <div className="absolute inset-0 bg-black/60 opacity-0 group-hover:opacity-100 transition-opacity flex items-end p-4">
                     <span className="text-xs font-semibold text-white truncate">{photo.title}</span>
@@ -209,13 +209,13 @@ function ModernTemplate({
               </div>
             </div>
 
-            <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 gap-6">
+            <div className="flex overflow-x-auto pb-4 gap-6 scroll-smooth snap-x scrollbar-thin">
               {teachers.map((teacher) => {
                 const photoUrl = teacher.photo
                   ? `${BACKEND_BASE}/${teacher.photo}`
                   : `https://ui-avatars.com/api/?name=${encodeURIComponent(teacher.full_name)}&background=18181b&color=fff&size=300`;
                 return (
-                  <div key={teacher.id} className="group flex flex-col bg-[#fafafa] rounded-2xl overflow-hidden border border-zinc-200 hover:border-zinc-300 hover:shadow-lg transition-all duration-300">
+                  <div key={teacher.id} className="w-[260px] md:w-[calc((100%-4.5rem)/4)] shrink-0 snap-start group flex flex-col bg-[#fafafa] rounded-2xl overflow-hidden border border-zinc-200 hover:border-zinc-300 hover:shadow-lg transition-all duration-300">
                     <div className="relative overflow-hidden aspect-[3/4] bg-zinc-100">
                       <img
                         src={photoUrl}
@@ -281,45 +281,57 @@ function ModernTemplate({
           {news.length === 0 ? (
             <div className="text-center py-12 text-zinc-450 text-sm font-light">Tidak ada berita yang diterbitkan dalam kategori ini.</div>
           ) : (
-            <div className="grid md:grid-cols-3 gap-8">
-              {news.map((item) => (
-                <Link key={item.id} to={`/school/${schoolSlug}/news/${item.slug || item.id}`} className="group bg-white rounded-xl overflow-hidden border border-zinc-200 hover:border-zinc-300 hover:shadow-md transition-all flex flex-col justify-between h-full">
-                  <div>
-                    <div className="h-48 w-full overflow-hidden bg-zinc-100">
-                      {item.image ? (
-                        <img 
-                          src={`${BACKEND_BASE}/${item.image}`} 
-                          alt={item.title} 
-                          className="h-full w-full object-cover group-hover:scale-105 transition-transform duration-300" 
-                        />
-                      ) : (
-                        <div className="flex h-full w-full items-center justify-center text-zinc-300">
-                          <ImageIcon className="h-10 w-10" />
-                        </div>
-                      )}
-                    </div>
-                    <div className="p-6 space-y-2">
-                      <div className="flex justify-between items-center text-[10px] font-bold text-zinc-450 uppercase tracking-widest">
-                        <span>{new Date(item.created_at).toLocaleDateString('id-ID', { day: 'numeric', month: 'long', year: 'numeric' })}</span>
-                        {item.category_name && (
-                          <span className="bg-zinc-100 px-2 py-0.5 rounded text-[8px] tracking-widest text-zinc-650">{item.category_name}</span>
+            <div className="space-y-12">
+              <div className="grid md:grid-cols-3 gap-8">
+                {news.slice(0, 6).map((item) => (
+                  <Link key={item.id} to={`/school/${schoolSlug}/news/${item.slug || item.id}`} className="group bg-white rounded-xl overflow-hidden border border-zinc-200 hover:border-zinc-300 hover:shadow-md transition-all flex flex-col justify-between h-full">
+                    <div>
+                      <div className="h-48 w-full overflow-hidden bg-zinc-100">
+                        {item.image ? (
+                          <img
+                            src={`${BACKEND_BASE}/${item.image}`}
+                            alt={item.title}
+                            className="h-full w-full object-cover group-hover:scale-105 transition-transform duration-300"
+                          />
+                        ) : (
+                          <div className="flex h-full w-full items-center justify-center text-zinc-300">
+                            <ImageIcon className="h-10 w-10" />
+                          </div>
                         )}
                       </div>
-                      <h3 className="font-bold text-zinc-950 text-base line-clamp-2 leading-snug group-hover:text-zinc-600 transition-colors">
-                        {item.title}
-                      </h3>
-                      <p className="text-xs text-zinc-500 leading-relaxed line-clamp-3 font-light">
-                        {item.content}
-                      </p>
+                      <div className="p-6 space-y-2">
+                        <div className="flex justify-between items-center text-[10px] font-bold text-zinc-450 uppercase tracking-widest">
+                          <span>{new Date(item.created_at).toLocaleDateString('id-ID', { day: 'numeric', month: 'long', year: 'numeric' })}</span>
+                          {item.category_name && (
+                            <span className="bg-zinc-100 px-2 py-0.5 rounded text-[8px] tracking-widest text-zinc-650">{item.category_name}</span>
+                          )}
+                        </div>
+                        <h3 className="font-bold text-zinc-950 text-base line-clamp-2 leading-snug group-hover:text-zinc-600 transition-colors">
+                          {item.title}
+                        </h3>
+                        <p className="text-xs text-zinc-500 leading-relaxed line-clamp-3 font-light">
+                          {item.content}
+                        </p>
+                      </div>
                     </div>
-                  </div>
-                  <div className="px-6 pb-5">
-                    <span className="inline-flex items-center gap-1 text-xs font-bold text-zinc-800 uppercase tracking-widest hover:underline">
-                      Baca Selengkapnya <ArrowRight className="h-3.5 w-3.5" />
-                    </span>
-                  </div>
-                </Link>
-              ))}
+                    <div className="px-6 pb-5">
+                      <span className="inline-flex items-center gap-1 text-xs font-bold text-zinc-800 uppercase tracking-widest hover:underline">
+                        Baca Selengkapnya <ArrowRight className="h-3.5 w-3.5" />
+                      </span>
+                    </div>
+                  </Link>
+                ))}
+              </div>
+              {news.length > 6 && (
+                <div className="text-center pt-4">
+                  <Link
+                    to={schoolSlug ? `/school/${schoolSlug}/news` : '/news'}
+                    className="inline-flex items-center gap-2 rounded-full bg-zinc-950 px-8 py-3 text-xs font-bold text-white shadow-md hover:bg-zinc-800 transition-all duration-300 uppercase tracking-wider"
+                  >
+                    Lihat Selengkapnya <ArrowRight className="h-4 w-4" />
+                  </Link>
+                </div>
+              )}
             </div>
           )}
         </div>
@@ -365,7 +377,7 @@ function ModernTemplate({
               <p className="text-sm text-zinc-400 leading-relaxed font-light">
                 {profile?.ppdb_banner_text || 'Mari daftarkan putra-putri Anda segera. Kami menyediakan pendaftaran online yang fleksibel dan instan untuk kenyamanan Anda.'}
               </p>
-              
+
               <ul className="space-y-3 font-light text-zinc-300">
                 <li className="flex items-center gap-3">
                   <CheckCircle className="w-4 h-4 text-amber-400 shrink-0" />
@@ -382,8 +394,8 @@ function ModernTemplate({
               </ul>
 
               <div className="pt-4">
-                <Link 
-                  to={ppdbLink} 
+                <Link
+                  to={ppdbLink}
                   className="inline-block rounded bg-white hover:bg-zinc-150 px-8 py-3.5 text-xs font-bold uppercase tracking-widest text-black transition-all"
                 >
                   Daftar Sekarang
@@ -393,11 +405,11 @@ function ModernTemplate({
 
             <div className="relative flex justify-center">
               <div className="w-full max-w-sm rounded-xl overflow-hidden shadow-2xl border border-zinc-800">
-                <img 
-                  src={heroImage} 
-                  alt="PPDB Banner" 
-                  className="w-full h-72 object-cover brightness-[0.7]" 
-                  loading="lazy" 
+                <img
+                  src={heroImage}
+                  alt="PPDB Banner"
+                  className="w-full h-72 object-cover brightness-[0.7]"
+                  loading="lazy"
                 />
               </div>
             </div>
@@ -444,18 +456,18 @@ function ModernTemplate({
           <form onSubmit={handleMessageSubmit} id="contact-form" className="mt-16 max-w-lg mx-auto space-y-4">
             <h3 className="text-sm font-bold uppercase tracking-widest text-center text-zinc-800 mb-6">Hubungi Admin</h3>
             <div>
-              <input 
-                type="text" 
+              <input
+                type="text"
                 required
                 value={formName}
                 onChange={(e) => setFormName(e.target.value)}
                 placeholder="Nama Lengkap Anda"
-                className="w-full px-4 py-3 rounded-lg border border-zinc-200 bg-white focus:border-zinc-900 outline-none text-sm text-zinc-700" 
+                className="w-full px-4 py-3 rounded-lg border border-zinc-200 bg-white focus:border-zinc-900 outline-none text-sm text-zinc-700"
               />
             </div>
             <div>
-              <textarea 
-                rows="4" 
+              <textarea
+                rows="4"
                 required
                 value={formMessage}
                 onChange={(e) => setFormMessage(e.target.value)}
@@ -463,8 +475,8 @@ function ModernTemplate({
                 className="w-full px-4 py-3 rounded-lg border border-zinc-200 bg-white focus:border-zinc-900 outline-none text-sm text-zinc-700"
               />
             </div>
-            <button 
-              type="submit" 
+            <button
+              type="submit"
               className="w-full py-3.5 rounded bg-zinc-950 hover:bg-zinc-800 font-bold text-xs uppercase tracking-widest text-white transition-colors"
             >
               Kirim Pesan
@@ -524,15 +536,16 @@ function SchoolHomeContent() {
 
   const { school, settings, profile, news, categories, events, announcements, gallery, teachers } = data;
 
-  const filteredNews = selectedCategoryId === 'all' 
-    ? news 
-    : news.filter(item => String(item.category_id) === String(selectedCategoryId));
+  const filteredNews = (selectedCategoryId === 'all'
+    ? news
+    : news.filter(item => String(item.category_id) === String(selectedCategoryId))
+  ).slice(0, 6);
 
   const isLocalhost = window.location.hostname === 'localhost' || window.location.hostname === '127.0.0.1';
   const ppdbLink = isLocalhost ? `/school/${schoolSlug}/ppdb` : '/ppdb';
 
-  const heroImage = settings?.hero_banner_image 
-    ? `${BACKEND_BASE}/${settings.hero_banner_image}` 
+  const heroImage = settings?.hero_banner_image
+    ? `${BACKEND_BASE}/${settings.hero_banner_image}`
     : 'https://images.unsplash.com/photo-1503676260728-1c00da094a0b?auto=format&fit=crop&w=1200&q=80';
 
   const principalPhoto = profile?.principal_photo
@@ -556,7 +569,7 @@ function SchoolHomeContent() {
   // CONDITIONAL RENDERING BASED ON CHOSEN TEMPLATE STYLE
   if (settings?.theme_template === 'modern') {
     return (
-      <ModernTemplate 
+      <ModernTemplate
         school={school}
         settings={settings}
         profile={profile}
@@ -584,7 +597,7 @@ function SchoolHomeContent() {
 
   return (
     <div className="w-full bg-[#ffffff] text-[#111111] selection:bg-[#d4af37] selection:text-black" style={{ fontFamily: "'DM Sans', sans-serif" }}>
-      
+
       {/* Announcements Alert Bar */}
       {announcements.length > 0 && (
         <div className="bg-[#111111] text-[#d4af37] py-2.5 px-6 border-b border-[#d4af37]/20">
@@ -606,19 +619,19 @@ function SchoolHomeContent() {
               {school.name}
             </h1>
             <p className="text-base md:text-lg text-zinc-300 leading-relaxed font-normal">
-              {profile?.hero_tagline && profile.hero_tagline.trim() !== "" 
-                ? profile.hero_tagline 
+              {profile?.hero_tagline && profile.hero_tagline.trim() !== ""
+                ? profile.hero_tagline
                 : 'Tempat terbaik bagi putra-putri Anda untuk belajar, bermain, dan berkembang dalam lingkungan yang aman, nyaman, dan penuh kasih sayang.'}
             </p>
             <div className="pt-2 flex flex-wrap gap-4">
-              <Link 
-                to={ppdbLink} 
+              <Link
+                to={ppdbLink}
                 className="inline-block rounded-full bg-[#d4af37] hover:bg-[#b38f1d] px-8 py-3.5 text-sm font-bold text-white transition-all duration-300 hover:scale-105 shadow-lg shadow-[#d4af37]/20"
               >
                 Pendaftaran PPDB Online
               </Link>
-              <a 
-                href="#profil" 
+              <a
+                href="#profil"
                 className="inline-block rounded-full border border-zinc-700 hover:border-zinc-500 bg-white/5 px-8 py-3.5 text-sm font-bold text-white transition-all duration-300"
               >
                 Profil Sekolah
@@ -628,11 +641,11 @@ function SchoolHomeContent() {
 
           <div className="relative flex justify-center">
             <div className="w-full max-w-md rounded-[2rem] overflow-hidden shadow-2xl transition-transform duration-500 border border-zinc-800 bg-[#1a1a1a] p-2">
-              <img 
-                src={heroImage} 
-                alt={school.name} 
-                className="w-full h-80 object-cover rounded-[1.8rem]" 
-                loading="lazy" 
+              <img
+                src={heroImage}
+                alt={school.name}
+                className="w-full h-80 object-cover rounded-[1.8rem]"
+                loading="lazy"
               />
             </div>
           </div>
@@ -644,11 +657,11 @@ function SchoolHomeContent() {
         <div className="max-w-6xl mx-auto px-6 grid md:grid-cols-2 gap-16 items-center">
           <div className="relative flex justify-center">
             <div className="w-full max-w-sm rounded-[2rem] overflow-hidden shadow-2xl transition-transform duration-500 border border-zinc-150 bg-white p-2">
-              <img 
-                src={principalPhoto} 
-                alt="Kepala Sekolah" 
-                className="w-full h-80 object-cover rounded-[1.8rem]" 
-                loading="lazy" 
+              <img
+                src={principalPhoto}
+                alt="Kepala Sekolah"
+                className="w-full h-80 object-cover rounded-[1.8rem]"
+                loading="lazy"
               />
             </div>
           </div>
@@ -661,7 +674,7 @@ function SchoolHomeContent() {
             <p className="text-sm text-zinc-650 leading-relaxed italic border-l-4 border-[#d4af37] pl-4">
               "{profile?.principal_welcome_message || 'Selamat datang di website resmi kami. Kami berkomitmen untuk membimbing tumbuh kembang anak didik dengan pola pengajaran aktif, kreatif, ceria, dan berkarakter mulia.'}"
             </p>
-            
+
             <div className="pt-4">
               <h3 className="font-bold text-[#111111] mb-2" style={{ fontFamily: "'Fraunces', serif" }}>Sejarah & Profil Singkat</h3>
               <p className="text-sm text-zinc-650 leading-relaxed font-light">
@@ -730,10 +743,10 @@ function SchoolHomeContent() {
             <div className="grid grid-cols-2 md:grid-cols-3 gap-6">
               {gallery.slice(0, 6).map((photo) => (
                 <div key={photo.id} className="group relative aspect-[4/3] rounded-2xl overflow-hidden shadow-md hover:shadow-2xl transition-all duration-300 border border-zinc-200 bg-white">
-                  <img 
-                    src={`${BACKEND_BASE}/${photo.image}`} 
-                    alt={photo.title} 
-                    className="h-full w-full object-cover transition-transform duration-300 group-hover:scale-105" 
+                  <img
+                    src={`${BACKEND_BASE}/${photo.image}`}
+                    alt={photo.title}
+                    className="h-full w-full object-cover transition-transform duration-300 group-hover:scale-105"
                   />
                   <div className="absolute inset-0 bg-gradient-to-t from-black/80 via-transparent to-transparent opacity-0 group-hover:opacity-100 transition-opacity flex items-end p-4">
                     <span className="text-xs font-semibold text-white truncate">{photo.title}</span>
@@ -755,13 +768,13 @@ function SchoolHomeContent() {
               <p className="text-sm text-zinc-500 font-light">Tenaga pendidik kami yang berdedikasi dan berpengalaman</p>
             </div>
 
-            <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 gap-6">
+            <div className="flex overflow-x-auto pb-4 gap-6 scroll-smooth snap-x scrollbar-thin">
               {teachers.map((teacher) => {
                 const photoUrl = teacher.photo
                   ? `${BACKEND_BASE}/${teacher.photo}`
                   : `https://ui-avatars.com/api/?name=${encodeURIComponent(teacher.full_name)}&background=111111&color=d4af37&size=300`;
                 return (
-                  <div key={teacher.id} className="group flex flex-col bg-[#fafafa] rounded-2xl overflow-hidden border border-zinc-200 hover:border-[#d4af37] hover:shadow-xl transition-all duration-300">
+                  <div key={teacher.id} className="w-[260px] md:w-[calc((100%-4.5rem)/4)] shrink-0 snap-start group flex flex-col bg-[#fafafa] rounded-2xl overflow-hidden border border-zinc-200 hover:border-[#d4af37] hover:shadow-xl transition-all duration-300">
                     <div className="relative overflow-hidden aspect-[3/4] bg-zinc-100">
                       <img
                         src={photoUrl}
@@ -833,10 +846,10 @@ function SchoolHomeContent() {
                   <div>
                     <div className="h-44 w-full overflow-hidden bg-zinc-150">
                       {item.image ? (
-                        <img 
-                          src={`${BACKEND_BASE}/${item.image}`} 
-                          alt={item.title} 
-                          className="h-full w-full object-cover group-hover:scale-105 transition-transform duration-300" 
+                        <img
+                          src={`${BACKEND_BASE}/${item.image}`}
+                          alt={item.title}
+                          className="h-full w-full object-cover group-hover:scale-105 transition-transform duration-300"
                         />
                       ) : (
                         <div className="flex h-full w-full items-center justify-center text-zinc-350">
@@ -912,7 +925,7 @@ function SchoolHomeContent() {
               <p className="text-sm text-zinc-650 leading-relaxed font-light">
                 {profile?.ppdb_banner_text || `Mari bergabung bersama keluarga besar ${school.name}. Pendaftaran untuk tahun ajaran baru telah resmi dibuka secara online melalui situs pendaftaran PPDB.`}
               </p>
-              
+
               <ul className="space-y-3.5">
                 <li className="flex items-center gap-3">
                   <CheckCircle className="w-5 h-5 text-zinc-900 shrink-0" />
@@ -929,8 +942,8 @@ function SchoolHomeContent() {
               </ul>
 
               <div className="pt-4">
-                <Link 
-                  to={ppdbLink} 
+                <Link
+                  to={ppdbLink}
                   className="inline-block rounded-full bg-[#d4af37] hover:bg-[#b38f1d] px-8 py-3.5 text-sm font-bold text-white transition-all duration-300 hover:scale-105 shadow-md shadow-[#d4af37]/10"
                 >
                   Daftarkan Anak Sekarang
@@ -940,11 +953,11 @@ function SchoolHomeContent() {
 
             <div className="relative flex justify-center">
               <div className="w-full max-w-sm rounded-[2rem] overflow-hidden shadow-xl border border-zinc-150 bg-white p-2">
-                <img 
-                  src={heroImage} 
-                  alt="PPDB Banner" 
-                  className="w-full h-64 object-cover rounded-[1.8rem]" 
-                  loading="lazy" 
+                <img
+                  src={heroImage}
+                  alt="PPDB Banner"
+                  className="w-full h-64 object-cover rounded-[1.8rem]"
+                  loading="lazy"
                 />
               </div>
             </div>

@@ -20,6 +20,7 @@ class CreateSchoolProfilesTable extends Migration
                 'constraint' => 20,
                 'unsigned'   => true,
             ],
+            'hero_tagline' => ['type' => 'VARCHAR', 'constraint' => 255, 'null' => true],
             'history' => [
                 'type' => 'TEXT',
                 'null' => true,
@@ -46,6 +47,7 @@ class CreateSchoolProfilesTable extends Migration
                 'type' => 'TEXT',
                 'null' => true,
             ],
+            'ppdb_banner_text' => ['type' => 'TEXT', 'null' => true],
             'created_at' => [
                 'type' => 'DATETIME',
                 'null' => true,

@@ -37,6 +37,7 @@ class CreateUsersTable extends Migration
                 'type'       => 'VARCHAR',
                 'constraint' => '100',
             ],
+            'phone' => ['type' => 'VARCHAR', 'constraint' => 30, 'null' => true],
             'status' => [
                 'type'       => 'ENUM',
                 'constraint' => ['active', 'inactive'],

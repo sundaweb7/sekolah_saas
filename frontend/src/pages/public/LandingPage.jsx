@@ -43,8 +43,8 @@ export default function LandingPage() {
       <header className="border-b border-zinc-900 bg-zinc-950/80 backdrop-blur-md sticky top-0 z-50">
         <div className="mx-auto max-w-6xl px-6 h-16 flex items-center justify-between">
           <div className="flex items-center gap-2">
-            <div className="h-8 w-8 rounded-lg bg-[#aa8410] flex items-center justify-center text-white font-bold text-sm">P</div>
-            <span className="font-bold text-lg tracking-tight text-white">PAUDKU.ID</span>
+            <img src="/koola.png" className="h-8 w-auto object-contain" alt="koola Logo" />
+            <span className="font-bold text-lg tracking-tight text-white">koola</span>
           </div>
           
           {/* Middle Nav Links (Desktop) */}
@@ -222,7 +222,7 @@ export default function LandingPage() {
             </div>
             <h3 className="font-bold text-white text-lg">Website Company Profile Sekolah</h3>
             <p className="text-sm text-zinc-400 leading-relaxed font-light">
-              Setiap sekolah mendapatkan subdomain unik (`sekolah.paudku.id`). Dilengkapi custom tema warna, visi misi, profil lembaga, galeri foto kegiatan, dan berita terintegrasi.
+              Setiap sekolah mendapatkan subdomain unik (`sekolah.koola.id`). Dilengkapi custom tema warna, visi misi, profil lembaga, galeri foto kegiatan, dan berita terintegrasi.
             </p>
           </div>
 
@@ -368,13 +368,13 @@ export default function LandingPage() {
         <div className="max-w-6xl mx-auto px-6 space-y-12">
           <div className="text-center max-w-2xl mx-auto space-y-3">
             <h2 className="text-3xl font-bold text-white tracking-tight">Dipercaya Oleh Lembaga Pendidikan</h2>
-            <p className="text-zinc-400 text-sm">Apa kata mereka yang telah mendigitalkan sekolahnya bersama PAUDKU.ID?</p>
+            <p className="text-zinc-400 text-sm">Apa kata mereka yang telah mendigitalkan sekolahnya bersama koola?</p>
           </div>
 
           <div className="grid grid-cols-1 md:grid-cols-3 gap-8">
             <div className="rounded-2xl border border-zinc-900 bg-zinc-950 p-6 space-y-4 hover:border-zinc-800 transition-all flex flex-col justify-between">
               <p className="text-xs text-zinc-400 leading-relaxed italic">
-                "Semenjak menggunakan PAUDKU.ID, penerimaan murid baru (PPDB) menjadi sangat mudah dan cepat. Pendidik kami juga sangat terbantu dengan adanya fitur absensi GPS mandiri langsung dari handphone."
+                "Semenjak menggunakan koola, penerimaan murid baru (PPDB) menjadi sangat mudah dan cepat. Pendidik kami juga sangat terbantu dengan adanya fitur absensi GPS mandiri langsung dari handphone."
               </p>
               <div className="flex items-center gap-3 pt-4 border-t border-zinc-900">
                 <div className="h-10 w-10 rounded-full bg-[#d4af37]/10 flex items-center justify-center text-[#d4af37] font-black text-xs border border-[#d4af37]/20">
@@ -422,7 +422,7 @@ export default function LandingPage() {
 
       {/* Footer */}
       <footer className="border-t border-zinc-900 py-12 bg-zinc-950 text-center text-sm text-zinc-500">
-        <p>&copy; {new Date().getFullYear()} PAUDKU.ID SaaS Platform. Hak Cipta Dilindungi Undang-Undang.</p>
+        <p>&copy; {new Date().getFullYear()} koola SaaS Platform. Hak Cipta Dilindungi Undang-Undang.</p>
       </footer>
     </div>
   );

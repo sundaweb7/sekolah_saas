@@ -4,7 +4,7 @@ import api from '../../config/axios';
 import { useAuth } from '../../context/AuthContext';
 import { 
   User, Calendar, FileText, CreditCard, LogOut, CheckCircle, 
-  Clock, AlertCircle, Loader2, ArrowRight, ShieldCheck, Heart, Sparkles, X, Menu, Copy, ExternalLink, GraduationCap, Award, CheckSquare, Megaphone
+  Clock, AlertCircle, Loader2, ArrowRight, ShieldCheck, Heart, Sparkles, X, Menu, Copy, ExternalLink, GraduationCap, Award, CheckSquare, Megaphone, MessageCircle, Bell
 } from 'lucide-react';
 
 export default function ParentDashboard() {
@@ -14,7 +14,9 @@ export default function ParentDashboard() {
   const [data, setData] = useState(null);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState(null);
-  const [activeMenu, setActiveMenu] = useState('spp'); // default to SPP
+  const [activeMenu, setActiveMenu] = useState('home'); // default to Home
+  const [notifications, setNotifications] = useState([]);
+  const [unreadNotificationsCount, setUnreadNotificationsCount] = useState(0);
   
   // Payment Modal
   const [selectedInvoice, setSelectedInvoice] = useState(null);
@@ -24,12 +26,18 @@ export default function ParentDashboard() {
   // Instructions Modal
   const [activeInstructions, setActiveInstructions] = useState(null);
 
-  const fetchParentData = async () => {
+  const fetchParentData = async (studentId = null) => {
     setLoading(true);
     setError(null);
     try {
-      const response = await api.get('/parent/dashboard');
+      const response = await api.get('/parent/dashboard', { params: studentId ? { student_id: studentId } : {} });
       setData(response.data.data || response.data);
+      
+      // Fetch notifications as well
+      const notifRes = await api.get('/communication/notifications');
+      const items = notifRes.data?.data?.items || notifRes.data?.items || [];
+      setNotifications(items);
+      setUnreadNotificationsCount(notifRes.data?.data?.unread_count || notifRes.data?.unread_count || 0);
     } catch (err) {
       setError(err.message || 'Gagal memuat portal orang tua.');
     } finally {
@@ -96,11 +104,12 @@ export default function ParentDashboard() {
     );
   }
 
-  const { child, spp_invoices, daily_activities, semester_report } = data;
+  const { child, children = [], spp_invoices, daily_activities, semester_report } = data;
 
   const menuItems = [
+    { id: 'home', label: 'Halaman Utama', shortLabel: 'Home', icon: <Sparkles className="h-5 w-5" /> },
     { id: 'profile', label: 'Profil Anak', shortLabel: 'Profil', icon: <User className="h-5 w-5" /> },
-    { id: 'activities', label: 'Kegiatan Harian', shortLabel: 'Kegiatan', icon: <Calendar className="h-5 w-5" /> },
+    { id: 'activities', label: 'Kegiatan Harian', shortLabel: 'Laporan', icon: <Calendar className="h-5 w-5" /> },
     { id: 'attendance', label: 'Kehadiran Siswa', shortLabel: 'Absen', icon: <CheckSquare className="h-5 w-5" /> },
     { id: 'announcements', label: 'Mading Pengumuman', shortLabel: 'Mading', icon: <Megaphone className="h-5 w-5" /> },
     { id: 'reports', label: 'Laporan Rapor', shortLabel: 'Rapor', icon: <FileText className="h-5 w-5" /> },
@@ -108,24 +117,43 @@ export default function ParentDashboard() {
   ];
 
   return (
-    <div className="min-h-screen bg-[#08060c] text-zinc-150 flex flex-col md:flex-row pb-20 md:pb-0">
+    <div className="min-h-screen bg-[#060408] text-zinc-100 flex flex-col md:flex-row pb-24 md:pb-0 font-sans">
+      
+      {/* Floating Communication Button (Mobile & Desktop) */}
+      <button 
+        onClick={() => navigate('/parent/communication')} 
+        className="fixed bottom-24 right-4 z-40 flex items-center gap-2 rounded-full bg-gradient-to-r from-[#d4af37] to-[#f3cb65] px-4 py-3.5 text-xs font-black text-black shadow-xl shadow-amber-500/20 hover:scale-105 transition-all md:bottom-6 md:right-6"
+      >
+        <MessageCircle className="h-4.5 w-4.5" />
+        Hubungi Sekolah
+      </button>
       
       {/* Sidebar Panel for Desktop */}
-      <aside className="hidden md:flex w-72 bg-[#0d0a17]/90 border-r border-zinc-900 flex-col justify-between shrink-0 p-6">
+      <aside className="hidden md:flex w-72 bg-[#0b0912] border-r border-zinc-900 flex-col justify-between shrink-0 p-6">
         <div className="space-y-6">
           {/* Top Logo Header */}
-          <div className="flex items-center gap-3 border-b border-zinc-900/60 pb-5">
-            <div className="h-10 w-10 rounded-xl bg-gradient-to-tr from-[#d4af37] to-[#ffd700] flex items-center justify-center text-black font-extrabold text-lg shadow-lg shadow-[#d4af37]/10">
+          <div className="flex items-center gap-3 border-b border-zinc-900 pb-5">
+            <div className="h-10 w-10 rounded-xl bg-gradient-to-tr from-[#d4af37] to-[#ffd700] flex items-center justify-center text-black font-extrabold text-lg shadow-lg shadow-[#d4af37]/20">
               👶
             </div>
             <div>
-              <h2 className="font-extrabold text-sm text-white tracking-wide">PORTAL WALI</h2>
-              <span className="text-[9px] uppercase font-bold tracking-widest text-[#d4af37] block mt-0.5">Sistem Akademik PAUD</span>
+              <h2 className="font-black text-sm text-white tracking-wider">KOOLA PAUD</h2>
+              <span className="text-[9px] uppercase font-bold tracking-widest text-[#d4af37] block mt-0.5">Portal Wali Murid</span>
             </div>
           </div>
 
           {/* Child Card - Premium Student Badge */}
-          <div className="rounded-2xl border border-zinc-900 bg-zinc-950/40 p-4 space-y-3">
+          <div className="rounded-2xl border border-zinc-800 bg-zinc-900/40 p-4 space-y-3 backdrop-blur-md">
+            {children.length > 1 && (
+              <select
+                value={child.id}
+                onChange={(event) => fetchParentData(event.target.value)}
+                className="w-full rounded-lg border border-zinc-850 bg-zinc-950 px-2 py-2 text-xs text-white outline-none focus:border-[#d4af37]"
+                aria-label="Pilih anak"
+              >
+                {children.map((item) => <option key={item.id} value={item.id}>{item.full_name}</option>)}
+              </select>
+            )}
             <div className="flex items-center gap-3">
               <div className="h-11 w-11 rounded-full bg-gradient-to-br from-[#d4af37] to-amber-600 flex items-center justify-center font-bold text-black uppercase border border-amber-400">
                 {child.full_name.charAt(0)}
@@ -135,23 +163,23 @@ export default function ParentDashboard() {
                 <p className="text-[10px] text-zinc-500 font-mono mt-0.5">{child.registration_number}</p>
               </div>
             </div>
-            <div className="text-[10px] bg-[#d4af37]/5 border border-[#d4af37]/10 rounded-lg p-2 text-center text-[#d4af37] font-semibold">
+            <div className="text-[10px] bg-[#d4af37]/10 border border-[#d4af37]/20 rounded-lg p-2 text-center text-[#d4af37] font-bold">
               🏫 {child.class_name}
             </div>
           </div>
 
           {/* Navigation */}
-          <nav className="space-y-1.5 pt-4">
+          <nav className="space-y-1 pt-4">
             {menuItems.map((item) => {
               const active = activeMenu === item.id;
               return (
                 <button
                   key={item.id}
                   onClick={() => setActiveMenu(item.id)}
-                  className={`w-full flex items-center gap-3.5 px-4 py-3 rounded-xl text-xs font-bold uppercase tracking-wider transition-all ${
+                  className={`w-full flex items-center gap-3 px-4 py-3 rounded-xl text-xs font-bold uppercase tracking-wider transition-all ${
                     active 
-                      ? 'bg-[#d4af37] text-black shadow-lg shadow-[#d4af37]/10' 
-                      : 'text-zinc-400 hover:bg-zinc-900/40 hover:text-white'
+                      ? 'bg-gradient-to-r from-[#d4af37] to-amber-500 text-black shadow-lg shadow-amber-500/10' 
+                      : 'text-zinc-400 hover:bg-zinc-900/50 hover:text-white'
                   }`}
                 >
                   <span className={active ? 'text-black' : 'text-zinc-500'}>
@@ -168,7 +196,7 @@ export default function ParentDashboard() {
         <div className="pt-4 border-t border-zinc-900">
           <button 
             onClick={logout}
-            className="w-full flex items-center justify-center gap-2 rounded-xl border border-zinc-900 bg-zinc-950/20 hover:bg-red-950/20 hover:text-red-400 hover:border-red-900/30 py-3 text-xs font-bold text-zinc-400 transition-all"
+            className="w-full flex items-center justify-center gap-2 rounded-xl border border-zinc-800 bg-zinc-950/20 hover:bg-red-950/20 hover:text-red-400 hover:border-red-900/30 py-3 text-xs font-bold text-zinc-400 transition-all"
           >
             <LogOut className="h-4 w-4" /> KELUAR PORTAL
           </button>
@@ -176,69 +204,190 @@ export default function ParentDashboard() {
       </aside>
 
       {/* Top Mobile Bar */}
-      <header className="md:hidden bg-[#0d0a17] border-b border-zinc-900 px-5 py-4 flex items-center justify-between sticky top-0 z-30 shadow-md">
+      <header className="md:hidden bg-[#0a0810]/90 backdrop-blur-lg border-b border-zinc-900 px-5 py-4 flex items-center justify-between sticky top-0 z-30 shadow-lg">
         <div className="flex items-center gap-3">
-          <div className="h-8 w-8 rounded-full bg-gradient-to-tr from-[#d4af37] to-amber-500 flex items-center justify-center text-black text-sm font-bold shadow-md">
+          <div className="h-9 w-9 rounded-full bg-gradient-to-tr from-[#d4af37] to-amber-500 flex items-center justify-center text-black text-sm font-bold shadow-md shadow-amber-500/10">
             👶
           </div>
           <div>
-            <h2 className="font-bold text-xs text-white leading-tight">{child.full_name}</h2>
-            <p className="text-[9px] font-bold text-[#d4af37] uppercase tracking-widest">{child.class_name}</p>
+            <h2 className="font-extrabold text-xs text-white leading-tight">{child.full_name}</h2>
+            <p className="text-[9px] font-bold text-[#d4af37] uppercase tracking-widest mt-0.5">🏫 {child.class_name}</p>
           </div>
         </div>
 
         <button 
           onClick={logout}
-          className="p-2 rounded-xl bg-zinc-900 hover:bg-zinc-800 text-zinc-400 hover:text-white transition-colors"
+          className="p-2.5 rounded-xl bg-zinc-900 border border-zinc-800 hover:bg-zinc-800 text-zinc-400 hover:text-white transition-colors"
           title="Keluar"
         >
-          <LogOut className="h-4.5 w-4.5" />
+          <LogOut className="h-4 w-4" />
         </button>
       </header>
 
       {/* Main Content Area */}
-      <main className="flex-1 p-6 md:p-12 max-w-5xl mx-auto w-full space-y-8">
+      <main className="flex-1 p-5 md:p-12 max-w-5xl mx-auto w-full space-y-8">
         
-        {/* Child Profile Section */}
+        {/* Home Section */}
+        {activeMenu === 'home' && (
+          <div className="space-y-8 animate-fadeIn">
+            <div className="flex flex-col md:flex-row md:items-center justify-between gap-4">
+              <div>
+                <h1 className="text-2xl md:text-3xl font-black text-white tracking-tight">Halo, Ayah / Bunda! 👋</h1>
+                <p className="text-xs text-zinc-500 mt-1">Selamat datang kembali di Portal Wali Murid KOOLA PAUD.</p>
+              </div>
+            </div>
+
+            {/* Premium Student Card */}
+            <div className="relative overflow-hidden rounded-3xl border border-[#d4af37]/30 bg-gradient-to-br from-zinc-950 via-[#181524] to-zinc-950 p-6 shadow-2xl flex items-center gap-5 shadow-[#d4af37]/5">
+              {/* Glowing glow effect */}
+              <div className="absolute top-0 right-0 h-36 w-36 rounded-full bg-[#d4af37]/10 blur-3xl" />
+              <div className="absolute -bottom-8 -left-8 h-28 w-28 rounded-full bg-purple-500/5 blur-2xl" />
+              
+              {/* Photo frame with gold ring */}
+              <div className="h-16 w-16 rounded-full bg-gradient-to-br from-[#ffd700] via-[#e5c158] to-[#b8860b] p-0.5 shadow-xl shrink-0 flex items-center justify-center">
+                <div className="h-full w-full rounded-full bg-zinc-950 flex items-center justify-center text-3xl">
+                  👦
+                </div>
+              </div>
+
+              <div className="min-w-0 flex-1 relative z-10">
+                <span className="inline-block text-[8px] font-black uppercase tracking-widest text-[#ffd700] bg-[#ffd700]/10 px-2 py-0.5 rounded border border-[#ffd700]/30">
+                  {child.class_name || 'Siswa Aktif'}
+                </span>
+                <h2 className="text-xl font-black bg-gradient-to-r from-[#ffd700] via-[#f3cb65] to-[#d4af37] bg-clip-text text-transparent truncate mt-1.5 tracking-tight">
+                  {child.full_name}
+                </h2>
+                <p className="text-[10px] text-zinc-400 font-mono mt-0.5">NIS: {child.registration_number}</p>
+              </div>
+            </div>
+
+            {/* Menu Mobile Lengkap Grid */}
+            <div className="space-y-4">
+              <h3 className="text-xs font-black uppercase tracking-wider text-zinc-500">Layanan & Fitur Akademik</h3>
+              <div className="grid grid-cols-3 gap-2">
+                <button onClick={() => setActiveMenu('activities')} className="flex flex-col items-center justify-center text-center p-3 rounded-2xl border border-zinc-900 bg-zinc-950/40 hover:border-zinc-850 transition-all space-y-2">
+                  <div className="h-9 w-9 rounded-xl bg-amber-500/10 text-amber-500 flex items-center justify-center shrink-0"><Calendar className="h-4.5 w-4.5" /></div>
+                  <span className="text-[10px] font-bold text-white font-sans leading-tight">Laporan Harian</span>
+                </button>
+                <button onClick={() => setActiveMenu('spp')} className="flex flex-col items-center justify-center text-center p-3 rounded-2xl border border-zinc-900 bg-zinc-950/40 hover:border-zinc-850 transition-all space-y-2">
+                  <div className="h-9 w-9 rounded-xl bg-[#d4af37]/10 text-[#d4af37] flex items-center justify-center shrink-0"><CreditCard className="h-4.5 w-4.5" /></div>
+                  <span className="text-[10px] font-bold text-white font-sans leading-tight">Pembayaran SPP</span>
+                </button>
+                <button onClick={() => setActiveMenu('reports')} className="flex flex-col items-center justify-center text-center p-3 rounded-2xl border border-zinc-900 bg-zinc-950/40 hover:border-zinc-850 transition-all space-y-2">
+                  <div className="h-9 w-9 rounded-xl bg-blue-500/10 text-blue-500 flex items-center justify-center shrink-0"><FileText className="h-4.5 w-4.5" /></div>
+                  <span className="text-[10px] font-bold text-white font-sans leading-tight">Rapor Semester</span>
+                </button>
+                <button onClick={() => setActiveMenu('profile')} className="flex flex-col items-center justify-center text-center p-3 rounded-2xl border border-zinc-900 bg-zinc-950/40 hover:border-zinc-850 transition-all space-y-2">
+                  <div className="h-9 w-9 rounded-xl bg-emerald-500/10 text-emerald-500 flex items-center justify-center shrink-0"><User className="h-4.5 w-4.5" /></div>
+                  <span className="text-[10px] font-bold text-white font-sans leading-tight">Profil Lengkap</span>
+                </button>
+                <button onClick={() => navigate('/parent/communication')} className="flex flex-col items-center justify-center text-center p-3 rounded-2xl border border-zinc-900 bg-zinc-950/40 hover:border-zinc-850 transition-all space-y-2">
+                  <div className="h-9 w-9 rounded-xl bg-purple-500/10 text-purple-500 flex items-center justify-center shrink-0"><MessageCircle className="h-4.5 w-4.5" /></div>
+                  <span className="text-[10px] font-bold text-white font-sans leading-tight">Konseling & Chat</span>
+                </button>
+                <button onClick={() => setActiveMenu('attendance')} className="flex flex-col items-center justify-center text-center p-3 rounded-2xl border border-zinc-900 bg-zinc-950/40 hover:border-zinc-850 transition-all space-y-2">
+                  <div className="h-9 w-9 rounded-xl bg-rose-500/10 text-rose-500 flex items-center justify-center shrink-0"><CheckSquare className="h-4.5 w-4.5" /></div>
+                  <span className="text-[10px] font-bold text-white font-sans leading-tight">Absensi Siswa</span>
+                </button>
+                <button onClick={() => setActiveMenu('announcements')} className="flex flex-col items-center justify-center text-center p-3 rounded-2xl border border-zinc-900 bg-zinc-950/40 hover:border-zinc-850 transition-all space-y-2">
+                  <div className="h-9 w-9 rounded-xl bg-cyan-500/10 text-cyan-500 flex items-center justify-center shrink-0"><Megaphone className="h-4.5 w-4.5" /></div>
+                  <span className="text-[10px] font-bold text-white font-sans leading-tight">Mading Sekolah</span>
+                </button>
+              </div>
+            </div>
+          </div>
+        )}
+
+        {/* Notifications Section */}
+        {activeMenu === 'notifications' && (
+          <div className="space-y-6 animate-fadeIn">
+            <div>
+              <h1 className="text-2xl md:text-3xl font-black text-white tracking-tight">Notifikasi</h1>
+              <p className="text-xs text-zinc-500 mt-1">Pemberitahuan dan kabar terbaru untuk Anda.</p>
+            </div>
+
+            <div className="space-y-3">
+              {notifications.length === 0 ? (
+                <div className="rounded-2xl border border-zinc-900 bg-zinc-900/20 p-12 text-center text-zinc-500 font-sans text-xs">
+                  Belum ada notifikasi baru.
+                </div>
+              ) : (
+                notifications.map((item) => (
+                  <div key={item.id} className={`rounded-2xl border p-4 text-left ${item.read_at ? 'bg-zinc-900/10 border-zinc-900' : 'border-amber-500/30 bg-amber-500/5'}`}>
+                    <div className="flex gap-3">
+                      <div className="h-8 w-8 rounded-xl bg-amber-500/10 text-amber-500 flex items-center justify-center shrink-0">
+                        <AlertCircle className="h-4.5 w-4.5" />
+                      </div>
+                      <div className="flex-1">
+                        <p className="text-sm font-bold text-white">{item.title}</p>
+                        <p className="mt-1 text-xs text-zinc-400 leading-relaxed font-sans">{item.body}</p>
+                        <p className="mt-2 text-[9px] text-zinc-550">
+                          {new Date(item.created_at).toLocaleDateString('id-ID', { day: 'numeric', month: 'long', year: 'numeric' })}
+                        </p>
+                      </div>
+                    </div>
+                  </div>
+                ))
+              )}
+            </div>
+          </div>
+        )}
+
+        {/* Child Profile Section (Stunning Digital Student ID Card) */}
         {activeMenu === 'profile' && (
           <div className="space-y-6 animate-fadeIn">
             <div>
-              <h1 className="text-2xl md:text-3xl font-extrabold text-white tracking-tight">Profil Anak Anda</h1>
-              <p className="text-sm text-zinc-500 mt-1">Informasi identitas murid terdaftar di sekolah.</p>
+              <h1 className="text-2xl md:text-3xl font-black text-white tracking-tight">Profil Anak Anda</h1>
+              <p className="text-xs text-zinc-500 mt-1">Kartu identitas digital siswa resmi terdaftar.</p>
             </div>
             
-            <div className="bg-zinc-900/20 rounded-2xl border border-zinc-900 p-6 md:p-8 flex flex-col md:flex-row gap-8 items-center backdrop-blur-md">
-              <div className="h-28 w-28 rounded-2xl bg-zinc-950/80 border-2 border-zinc-800 flex items-center justify-center text-5xl shadow-xl">
-                👦
-              </div>
-              <div className="space-y-4 flex-1 w-full text-center md:text-left">
-                <div className="border-b border-zinc-900 pb-3">
-                  <p className="text-[9px] font-bold text-zinc-500 uppercase tracking-widest">Nama Lengkap Anak</p>
-                  <p className="text-xl font-extrabold text-[#d4af37] mt-0.5">{child.full_name}</p>
-                </div>
+            <div className="grid grid-cols-1 gap-6">
+              {/* Digital ID Card */}
+              <div className="relative overflow-hidden rounded-3xl border border-zinc-800 bg-gradient-to-br from-[#120e1d] to-[#08060c] p-6 md:p-8 shadow-2xl flex flex-col md:flex-row gap-6 md:gap-8 items-center">
+                {/* Glowing glow effect */}
+                <div className="absolute top-0 right-0 h-40 w-40 rounded-full bg-[#d4af37]/5 blur-3xl" />
                 
-                <div className="grid grid-cols-2 md:grid-cols-3 gap-6 text-left">
-                  <div>
-                    <p className="text-[9px] font-bold text-zinc-500 uppercase tracking-widest">Nomor Induk / Registrasi</p>
-                    <p className="text-xs md:text-sm font-bold text-white font-mono mt-1">{child.registration_number}</p>
+                {/* Photo frame */}
+                <div className="relative shrink-0">
+                  <div className="h-28 w-28 rounded-2xl bg-gradient-to-br from-[#d4af37] to-amber-600 p-0.5 shadow-xl">
+                    <div className="h-full w-full rounded-[14px] bg-zinc-950 flex items-center justify-center text-5xl">
+                      👦
+                    </div>
                   </div>
+                  <span className="absolute -bottom-2 -right-2 bg-emerald-500 text-zinc-950 px-2 py-0.5 rounded-full text-[8px] font-black uppercase tracking-wider shadow">
+                    Aktif
+                  </span>
+                </div>
+
+                <div className="space-y-4 flex-1 w-full text-center md:text-left">
                   <div>
-                    <p className="text-[9px] font-bold text-zinc-500 uppercase tracking-widest">Jenis Kelamin</p>
-                    <p className="text-xs md:text-sm font-bold text-white mt-1">{child.gender}</p>
+                    <span className="text-[9px] font-bold text-zinc-500 uppercase tracking-widest">Nama Lengkap Murid</span>
+                    <h2 className="text-2xl font-black text-[#d4af37] mt-0.5 tracking-tight">{child.full_name}</h2>
                   </div>
-                  <div>
-                    <p className="text-[9px] font-bold text-zinc-500 uppercase tracking-widest">Tanggal Lahir</p>
-                    <p className="text-xs md:text-sm font-bold text-white mt-1">
-                      {new Date(child.birth_date).toLocaleDateString('id-ID', { day: 'numeric', month: 'long', year: 'numeric' })}
-                    </p>
-                  </div>
-                  <div>
-                    <p className="text-[9px] font-bold text-zinc-500 uppercase tracking-widest">Wali Kelas</p>
-                    <p className="text-xs md:text-sm font-bold text-[#d4af37] mt-1">{child.teacher_name || 'Belum ditugaskan'}</p>
-                  </div>
-                  <div>
-                    <p className="text-[9px] font-bold text-zinc-500 uppercase tracking-widest">Kelas / Kelompok</p>
-                    <p className="text-xs md:text-sm font-bold text-white mt-1">{child.class_name || 'Belum masuk kelas'}</p>
+                  
+                  <div className="grid grid-cols-2 sm:grid-cols-3 gap-y-4 gap-x-6 text-left pt-4 border-t border-zinc-900/60">
+                    <div>
+                      <span className="text-[9px] font-bold text-zinc-500 uppercase tracking-widest block">Nomor Induk / NIS</span>
+                      <span className="text-xs font-bold text-white font-mono mt-0.5 block">{child.registration_number}</span>
+                    </div>
+                    <div>
+                      <span className="text-[9px] font-bold text-zinc-500 uppercase tracking-widest block">Jenis Kelamin</span>
+                      <span className="text-xs font-bold text-white mt-0.5 block">{child.gender === 'L' ? 'Laki-laki' : 'Perempuan'}</span>
+                    </div>
+                    <div>
+                      <span className="text-[9px] font-bold text-zinc-500 uppercase tracking-widest block">Tanggal Lahir</span>
+                      <span className="text-xs font-bold text-white mt-0.5 block">
+                        {new Date(child.birth_date).toLocaleDateString('id-ID', { day: 'numeric', month: 'long', year: 'numeric' })}
+                      </span>
+                    </div>
+                    <div>
+                      <span className="text-[9px] font-bold text-zinc-500 uppercase tracking-widest block">Wali Kelas</span>
+                      <span className="text-xs font-bold text-[#d4af37] mt-0.5 block">{child.teacher_name || 'Belum ditugaskan'}</span>
+                    </div>
+                    <div>
+                      <span className="text-[9px] font-bold text-zinc-500 uppercase tracking-widest block">Kelas / Kelompok</span>
+                      <span className="text-xs font-bold text-white mt-0.5 block">{child.class_name || 'Belum masuk kelas'}</span>
+                    </div>
                   </div>
                 </div>
               </div>
@@ -505,16 +654,27 @@ export default function ParentDashboard() {
 
       {/* Bottom Navigation Bar for Mobile */}
       <nav className="md:hidden fixed bottom-0 left-0 right-0 bg-[#0d0a17] border-t border-zinc-900 flex justify-around items-center py-2.5 z-40 shadow-lg">
-        {menuItems.map((item) => {
+        {[
+          { id: 'home', label: 'Home', icon: <Sparkles className="h-5 w-5" /> },
+          { id: 'activities', label: 'Laporan', icon: <Calendar className="h-5 w-5" /> },
+          { id: 'notifications', label: 'Notifikasi', icon: <Bell className="h-5 w-5" />, badge: unreadNotificationsCount },
+          { id: 'spp', label: 'SPP', icon: <CreditCard className="h-5 w-5" /> },
+          { id: 'profile', label: 'Profile', icon: <User className="h-5 w-5" /> }
+        ].map((item) => {
           const active = activeMenu === item.id;
           return (
             <button
               key={item.id}
               onClick={() => setActiveMenu(item.id)}
-              className={`flex flex-col items-center gap-1 transition-all ${active ? 'text-[#d4af37] font-bold scale-105' : 'text-zinc-550 hover:text-zinc-300'}`}
+              className={`relative flex flex-col items-center gap-1 transition-all ${active ? 'text-[#d4af37] font-bold scale-105' : 'text-zinc-500 hover:text-zinc-300'}`}
             >
               {item.icon}
-              <span className="text-[10px] tracking-tight">{item.shortLabel}</span>
+              <span className="text-[10px] tracking-tight">{item.label}</span>
+              {item.badge > 0 && (
+                <span className="absolute -top-1 right-2 rounded-full bg-red-500 px-1.5 py-0.5 text-[8px] text-white font-bold leading-none">
+                  {item.badge}
+                </span>
+              )}
             </button>
           );
         })}

@@ -67,3 +67,18 @@
 #--------------------------------------------------------------------
 
 # logger.threshold = 4
+
+#--------------------------------------------------------------------
+# SECURITY (required in production)
+#--------------------------------------------------------------------
+
+# JWT_SECRET = replace-with-at-least-32-random-characters
+# JWT_EXPIRE = 3600
+# JWT_REFRESH_EXPIRE = 2592000
+# CORS_ALLOWED_ORIGINS = https://app.example.id,https://example.id
+# CORS_ALLOWED_ORIGIN_PATTERNS = #^https://[a-z0-9-]+\.example\.id$#
+# FRONTEND_BASE_URL = https://example.id
+# TRIPAY_API_KEY =
+# TRIPAY_PRIVATE_KEY =
+# TRIPAY_MERCHANT_CODE =
+# TRIPAY_IS_SANDBOX = true

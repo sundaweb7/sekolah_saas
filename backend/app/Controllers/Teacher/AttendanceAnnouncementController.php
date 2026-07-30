@@ -5,6 +5,7 @@ namespace App\Controllers\Teacher;
 use App\Controllers\BaseResourceController;
 use App\Models\StudentAttendanceModel;
 use App\Models\ClassAnnouncementModel;
+use App\Models\AttendancePinModel;
 use App\Models\TeacherModel;
 use App\Models\ClassModel;
 use App\Models\StudentModel;
@@ -20,6 +21,7 @@ class AttendanceAnnouncementController extends BaseResourceController
     protected ClassAnnouncementModel $announcementModel;
     protected TeacherModel $teacherModel;
     protected ClassModel $classModel;
+    protected AttendancePinModel $pinModel;
 
     public function __construct()
     {
@@ -29,6 +31,7 @@ class AttendanceAnnouncementController extends BaseResourceController
         $this->classModel = new ClassModel();
         $this->teacherAttendanceModel = new TeacherAttendanceModel();
         $this->classJournalModel = new ClassJournalModel();
+        $this->pinModel = new AttendancePinModel();
     }
 
     /**
@@ -353,5 +356,307 @@ class AttendanceAnnouncementController extends BaseResourceController
         }
 
         return $this->respondSuccess($record, 'Jurnal pembelajaran harian berhasil disimpan.');
+    }
+
+    /**
+     * GET /api/v1/teacher/attendance/recap
+     * Returns monthly attendance recap per student for the teacher's class.
+     * Query params: month (YYYY-MM), e.g. 2026-07
+     */
+    public function getAttendanceRecap(): ResponseInterface
+    {
+        $context = $this->getTeacherClass();
+        if (!$context || !$context['class']) {
+            return $this->respondError('Kelas bimbingan tidak ditemukan.', ResponseInterface::HTTP_NOT_FOUND);
+        }
+
+        $classId = $context['class']->id;
+        $month   = $this->request->getVar('month') ?: date('Y-m');
+
+        // Validate month format YYYY-MM
+        if (!preg_match('/^\d{4}-\d{2}$/', $month)) {
+            return $this->respondError('Format bulan tidak valid. Gunakan YYYY-MM.', ResponseInterface::HTTP_BAD_REQUEST);
+        }
+
+        $studentModel = new StudentModel();
+        $students     = $studentModel
+            ->where('current_class_id', $classId)
+            ->where('status', 'aktif')
+            ->findAll();
+
+        $db = \Config\Database::connect();
+
+        $recap = [];
+        foreach ($students as $st) {
+            // Count per status for this student in the given month
+            $counts = $db->table('student_attendances')
+                ->select("
+                    SUM(CASE WHEN status = 'hadir' THEN 1 ELSE 0 END) AS hadir,
+                    SUM(CASE WHEN status = 'sakit' THEN 1 ELSE 0 END) AS sakit,
+                    SUM(CASE WHEN status = 'izin'  THEN 1 ELSE 0 END) AS izin,
+                    SUM(CASE WHEN status = 'alfa'  THEN 1 ELSE 0 END) AS alfa,
+                    COUNT(*) AS total_recorded
+                ")
+                ->where('student_id', $st->id)
+                ->where('class_id', $classId)
+                ->like('date', $month, 'after')   // LIKE '2026-07%'
+                ->get()
+                ->getRowArray();
+
+            // Count distinct school days that have ANY attendance record in this class+month
+            $schoolDays = (int)$db->table('student_attendances')
+                ->selectMax('date')   // just to anchor
+                ->select('COUNT(DISTINCT date) AS days', false)
+                ->where('class_id', $classId)
+                ->like('date', $month, 'after')
+                ->get()
+                ->getRow()
+                ->days ?? 0;
+
+            $recap[] = [
+                'student_id'         => $st->id,
+                'student_name'       => $st->full_name,
+                'registration_number'=> $st->registration_number,
+                'photo'              => $st->photo,
+                'hadir'              => (int)($counts['hadir'] ?? 0),
+                'sakit'              => (int)($counts['sakit'] ?? 0),
+                'izin'               => (int)($counts['izin'] ?? 0),
+                'alfa'               => (int)($counts['alfa'] ?? 0),
+                'total_recorded'     => (int)($counts['total_recorded'] ?? 0),
+                'school_days'        => $schoolDays,
+            ];
+        }
+
+        return $this->respondSuccess([
+            'month'   => $month,
+            'class'   => $context['class']->name,
+            'students'=> $recap,
+        ]);
+    }
+
+    // ─────────────────────────────────────────────────────────────
+    // PIN DINAMIS
+    // ─────────────────────────────────────────────────────────────
+
+    /**
+     * GET /api/v1/teacher/attendance/pin
+     * Returns (or creates) today's PIN for the teacher's class.
+     */
+    public function getPin(): ResponseInterface
+    {
+        $context = $this->getTeacherClass();
+        if (!$context || !$context['class']) {
+            return $this->respondError('Kelas bimbingan tidak ditemukan.', ResponseInterface::HTTP_NOT_FOUND);
+        }
+
+        $user     = $this->request->user;
+        $schoolId = (int) $user->school_id;
+        $classId  = (int) $context['class']->id;
+
+        $pin = $this->pinModel->getOrCreate($schoolId, $classId, (int) $user->id);
+
+        return $this->respondSuccess([
+            'pin'        => $pin->pin,
+            'date'       => $pin->date,
+            'expires_at' => $pin->expires_at,
+            'class'      => $context['class']->name,
+        ]);
+    }
+
+    /**
+     * POST /api/v1/teacher/attendance/pin/refresh
+     * Force-refresh the PIN (delete existing & generate new).
+     */
+    public function refreshPin(): ResponseInterface
+    {
+        $context = $this->getTeacherClass();
+        if (!$context || !$context['class']) {
+            return $this->respondError('Kelas bimbingan tidak ditemukan.', ResponseInterface::HTTP_NOT_FOUND);
+        }
+
+        $user     = $this->request->user;
+        $schoolId = (int) $user->school_id;
+        $classId  = (int) $context['class']->id;
+        $date     = date('Y-m-d');
+
+        // Delete existing PIN so getOrCreate makes a fresh one
+        $this->pinModel->where('school_id', $schoolId)->where('class_id', $classId)->where('date', $date)->delete();
+
+        $pin = $this->pinModel->getOrCreate($schoolId, $classId, (int) $user->id);
+
+        return $this->respondSuccess([
+            'pin'        => $pin->pin,
+            'date'       => $pin->date,
+            'expires_at' => $pin->expires_at,
+        ], 'PIN absensi diperbarui.');
+    }
+
+    // ─────────────────────────────────────────────────────────────
+    // KIOSK ENDPOINT (public — requires valid PIN only)
+    // ─────────────────────────────────────────────────────────────
+
+    /**
+     * POST /api/v1/kiosk/checkin
+     * No JWT required. Body: { school_id, pin, student_id, source='kiosk' }
+     */
+    public function kioskCheckin(): ResponseInterface
+    {
+        $json     = $this->request->getJSON(true) ?? [];
+        $schoolId = (int) ($json['school_id'] ?? 0);
+        $pin      = trim((string) ($json['pin'] ?? ''));
+        $studentId = (int) ($json['student_id'] ?? 0);
+
+        if (!$schoolId || !$pin || !$studentId) {
+            return $this->respondError('school_id, pin, dan student_id wajib diisi.', 422);
+        }
+
+        $pinRecord = $this->pinModel->verifyPin($schoolId, $pin);
+        if (!$pinRecord) {
+            return $this->respondError('PIN tidak valid atau sudah kadaluarsa.', 403);
+        }
+
+        $student = (new StudentModel())->where('id', $studentId)->where('school_id', $schoolId)->first();
+        if (!$student || (int) $student->current_class_id !== (int) $pinRecord->class_id) {
+            return $this->respondError('Siswa tidak ditemukan atau bukan anggota kelas ini.', 403);
+        }
+
+        $date    = date('Y-m-d');
+        $time    = date('H:i:s');
+        // Tentukan terlambat jika lewat 07:30
+        $lateMinutes = 0;
+        $cutoff = strtotime($date . ' 07:30:00');
+        if (time() > $cutoff) {
+            $lateMinutes = (int) round((time() - $cutoff) / 60);
+        }
+        $status = $lateMinutes > 0 ? 'terlambat' : 'hadir';
+
+        $existing = $this->attendanceModel
+            ->where('student_id', $studentId)
+            ->where('date', $date)
+            ->first();
+
+        $payload = [
+            'status'         => $status,
+            'check_in_time'  => $time,
+            'late_minutes'   => $lateMinutes,
+            'source'         => 'kiosk',
+        ];
+
+        if ($existing) {
+            $this->attendanceModel->update($existing->id, $payload);
+        } else {
+            $this->attendanceModel->insert(array_merge($payload, [
+                'school_id'  => $schoolId,
+                'student_id' => $studentId,
+                'class_id'   => $pinRecord->class_id,
+                'date'       => $date,
+            ]));
+        }
+
+        return $this->respondSuccess([
+            'student_name' => $student->full_name,
+            'status'       => $status,
+            'check_in_time'=> $time,
+            'late_minutes' => $lateMinutes,
+        ], $status === 'hadir' ? "Selamat datang, {$student->full_name}!" : "Halo {$student->full_name}, Anda terlambat {$lateMinutes} menit.");
+    }
+
+    /**
+     * POST /api/v1/kiosk/validate-pin
+     * No JWT required. Returns class + students list when PIN valid.
+     * Body: { school_id, pin }
+     */
+    public function validatePinPublic(): ResponseInterface
+    {
+        $json     = $this->request->getJSON(true) ?? [];
+        $schoolId = (int) ($json['school_id'] ?? 0);
+        $pin      = trim((string) ($json['pin'] ?? ''));
+
+        if (!$schoolId || !$pin) {
+            return $this->respondError('school_id dan pin wajib diisi.', 422);
+        }
+
+        $pinRecord = $this->pinModel->verifyPin($schoolId, $pin);
+        if (!$pinRecord) {
+            return $this->respondError('PIN tidak valid atau sudah kadaluarsa.', 403);
+        }
+
+        $class = $this->classModel->find($pinRecord->class_id);
+        $students = (new StudentModel())
+            ->select('id, full_name, nis, photo, registration_number')
+            ->where('current_class_id', $pinRecord->class_id)
+            ->where('school_id', $schoolId)
+            ->where('status', 'aktif')
+            ->orderBy('full_name', 'ASC')
+            ->findAll();
+
+        // Get today's attendance for this class
+        $date = date('Y-m-d');
+        $checkedIn = $this->attendanceModel
+            ->select('student_id, status, check_in_time, late_minutes')
+            ->where('class_id', $pinRecord->class_id)
+            ->where('date', $date)
+            ->findAll();
+
+        $checkedMap = [];
+        foreach ($checkedIn as $att) {
+            $checkedMap[$att->student_id] = $att;
+        }
+
+        $studentList = array_map(function ($s) use ($checkedMap) {
+            return [
+                'id'          => $s->id,
+                'full_name'   => $s->full_name,
+                'nis'         => $s->nis,
+                'photo'       => $s->photo,
+                'checked_in'  => isset($checkedMap[$s->id]),
+                'status'      => $checkedMap[$s->id]->status ?? null,
+                'check_in_time' => $checkedMap[$s->id]->check_in_time ?? null,
+                'late_minutes'  => $checkedMap[$s->id]->late_minutes ?? 0,
+            ];
+        }, $students);
+
+        return $this->respondSuccess([
+            'class'    => $class ? $class->name : 'Kelas',
+            'date'     => $date,
+            'students' => $studentList,
+            'school_id'=> $schoolId,
+            'class_id' => $pinRecord->class_id,
+        ]);
+    }
+
+    /**
+     * GET /api/v1/teacher/attendance/my-history
+     * Returns monthly attendance history of the authenticated teacher.
+     */
+    public function getMyHistory(): ResponseInterface
+    {
+        $schoolId = defined('CURRENT_SCHOOL_ID') ? CURRENT_SCHOOL_ID : null;
+        if (!$schoolId) {
+            return $this->respondError('School context required.', ResponseInterface::HTTP_BAD_REQUEST);
+        }
+
+        $userId = $this->request->user->id;
+        $teacherModel = new \App\Models\TeacherModel();
+        $teacher = $teacherModel->where('school_id', $schoolId)->where('user_id', $userId)->first();
+        if (!$teacher) {
+            return $this->respondError('Guru tidak ditemukan.', ResponseInterface::HTTP_NOT_FOUND);
+        }
+
+        $month = $this->request->getVar('month') ?: date('Y-m');
+        if (!preg_match('/^\d{4}-\d{2}$/', $month)) {
+            return $this->respondError('Format bulan tidak valid. Gunakan YYYY-MM.', ResponseInterface::HTTP_BAD_REQUEST);
+        }
+
+        $db = \Config\Database::connect();
+        $records = $db->table('teacher_attendances')
+            ->where('school_id', $schoolId)
+            ->where('teacher_id', $teacher->id)
+            ->where("date LIKE '{$month}%'")
+            ->orderBy('date', 'DESC')
+            ->get()
+            ->getResult();
+
+        return $this->respondSuccess($records);
     }
 }

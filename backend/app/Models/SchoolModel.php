@@ -12,7 +12,10 @@ class SchoolModel extends Model
     protected $returnType       = 'object';
     protected $useSoftDeletes   = true;
     protected $protectFields    = true;
-    protected $allowedFields    = ['name', 'subdomain', 'custom_domain', 'custom_domain_status', 'status', 'phone', 'npsn', 'level'];
+    protected $allowedFields    = [
+        'name', 'subdomain', 'custom_domain', 'custom_domain_status', 'status',
+        'phone', 'npsn', 'level', 'subscription_plan', 'billing_cycle', 'expires_at',
+    ];
 
     protected bool $allowEmptyInserts = false;
 

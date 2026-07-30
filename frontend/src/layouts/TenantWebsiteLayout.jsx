@@ -1,6 +1,7 @@
 import { useState, useEffect } from 'react';
 import { useParams, Link } from 'react-router-dom';
 import api from '../config/axios';
+import { tenantHeaders } from '../utils/tenant';
 import { 
   Loader2, Globe, Phone, Mail, MapPin,
   Home, User, Target, Image, Newspaper, MessageCircle
@@ -57,16 +58,8 @@ export default function TenantWebsiteLayout({ children }) {
       setLoading(true);
       setError(null);
       try {
-        const host = window.location.hostname;
-        let subdomain = host.split('.')[0];
-        if (subdomain === 'localhost' || subdomain === '127') {
-          subdomain = schoolSlug || 'tkmelati';
-        }
-
         const response = await api.get('/tenant/profile', {
-          headers: {
-            'X-School-ID': subdomain === 'tkmelati' ? '1' : localStorage.getItem('school_id') || '1'
-          }
+          headers: tenantHeaders(schoolSlug),
         });
         
         const resData = response.data;
@@ -129,6 +122,26 @@ export default function TenantWebsiteLayout({ children }) {
     ? `https://wa.me/${waNumber}?text=Halo%20${encodeURIComponent(school.name)}%2C%20saya%20ingin%20bertanya.`
     : 'https://wa.me/';
 
+  const getMenuHrefAndAnchor = (menu) => {
+    let isAnchor = false;
+    let href = '#';
+    if (typeof menu === 'object') {
+      const type = menu.type || 'built_in';
+      const value = menu.value || menu.path || '';
+      if (type === 'page') {
+        href = schoolSlug ? `/school/${schoolSlug}/page/${value}` : `/page/${value}`;
+      } else if (type === 'link') {
+        href = value;
+      } else {
+        isAnchor = value.startsWith('#');
+        href = isAnchor
+          ? (schoolSlug ? `/school/${schoolSlug}${value}` : value)
+          : (schoolSlug && !value.startsWith('/') ? `/school/${schoolSlug}/${value.replace(/^\//, '')}` : value);
+      }
+    }
+    return { href, isAnchor };
+  };
+
   return (
     <div className="min-h-screen bg-zinc-950 text-zinc-100 selection:bg-primary selection:text-white font-sans scroll-smooth">
       {/* Sticky Header */}
@@ -151,11 +164,7 @@ export default function TenantWebsiteLayout({ children }) {
             {/* Navigation Menu with Icons */}
             <nav className="hidden md:flex items-center gap-1">
               {menuData.map((menu, idx) => {
-                const isAnchor = menu.path && menu.path.startsWith('#');
-                const href = isAnchor
-                  ? (schoolSlug ? `/school/${schoolSlug}${menu.path}` : menu.path)
-                  : menu.path;
-
+                const { href, isAnchor } = getMenuHrefAndAnchor(menu);
                 const icon = getNavIcon(menu.label);
 
                 if (isAnchor) {
@@ -163,6 +172,23 @@ export default function TenantWebsiteLayout({ children }) {
                     <a
                       key={idx}
                       href={href}
+                      className="flex items-center gap-1.5 px-3 py-2 rounded-lg text-sm font-medium text-zinc-400 hover:text-white hover:bg-white/5 transition-all"
+                    >
+                      {icon && <span className="opacity-70">{icon}</span>}
+                      {menu.label}
+                    </a>
+                  );
+                }
+
+                // If type is 'link' and is absolute external link (starts with http)
+                const isExternal = href.startsWith('http://') || href.startsWith('https://');
+                if (isExternal) {
+                  return (
+                    <a
+                      key={idx}
+                      href={href}
+                      target="_blank"
+                      rel="noopener noreferrer"
                       className="flex items-center gap-1.5 px-3 py-2 rounded-lg text-sm font-medium text-zinc-400 hover:text-white hover:bg-white/5 transition-all"
                     >
                       {icon && <span className="opacity-70">{icon}</span>}
@@ -208,7 +234,7 @@ export default function TenantWebsiteLayout({ children }) {
         <div className="mx-auto max-w-6xl px-6 grid grid-cols-1 md:grid-cols-3 gap-10 relative z-10">
           <div className="space-y-4">
             <h3 className="font-black text-white text-lg tracking-tight flex items-center gap-2">
-              <span className="h-2 w-2 rounded-full bg-[#d4af37]" /> {school.name}
+              <span className="h-2 w-2 rounded-full bg-primary" /> {school.name}
             </h3>
             <p className="text-sm leading-relaxed text-zinc-400 font-light max-w-sm">
               Mewujudkan pendidikan anak usia dini yang cerdas, kreatif, ceria, dan berakhlak mulia demi masa depan generasi emas bangsa.
@@ -216,35 +242,41 @@ export default function TenantWebsiteLayout({ children }) {
           </div>
           
           <div className="space-y-4">
-            <h4 className="font-extrabold text-white text-xs uppercase tracking-widest text-[#d4af37]">Kontak Kami</h4>
+            <h4 className="font-extrabold text-white text-xs uppercase tracking-widest text-primary">Kontak Kami</h4>
             <ul className="space-y-3 text-sm">
               <li className="flex items-start gap-3">
-                <Phone className="h-4.5 w-4.5 text-[#d4af37] shrink-0 mt-0.5" />
+                <Phone className="h-4.5 w-4.5 text-primary shrink-0 mt-0.5" />
                 <span className="text-zinc-300 font-light">{contactInfo.phone}</span>
               </li>
               <li className="flex items-start gap-3">
-                <Mail className="h-4.5 w-4.5 text-[#d4af37] shrink-0 mt-0.5" />
+                <Mail className="h-4.5 w-4.5 text-primary shrink-0 mt-0.5" />
                 <span className="text-zinc-300 font-light truncate">{contactInfo.email}</span>
               </li>
               <li className="flex items-start gap-3">
-                <MapPin className="h-4.5 w-4.5 text-[#d4af37] shrink-0 mt-0.5" />
+                <MapPin className="h-4.5 w-4.5 text-primary shrink-0 mt-0.5" />
                 <span className="text-zinc-300 font-light leading-relaxed">{contactInfo.address}</span>
               </li>
             </ul>
           </div>
           
           <div className="space-y-4">
-            <h4 className="font-extrabold text-white text-xs uppercase tracking-widest text-[#d4af37]">Navigasi Cepat</h4>
+            <h4 className="font-extrabold text-white text-xs uppercase tracking-widest text-primary">Navigasi Cepat</h4>
             <div className="grid grid-cols-2 gap-2 text-sm">
               {menuData.map((menu, idx) => {
-                const isAnchor = menu.path && menu.path.startsWith('#');
-                const href = isAnchor
-                  ? (schoolSlug ? `/school/${schoolSlug}${menu.path}` : menu.path)
-                  : menu.path;
+                const { href, isAnchor } = getMenuHrefAndAnchor(menu);
                 
                 if (isAnchor) {
                   return (
                     <a key={idx} href={href} className="text-zinc-400 hover:text-white transition-colors font-light">
+                      {menu.label}
+                    </a>
+                  );
+                }
+
+                const isExternal = href.startsWith('http://') || href.startsWith('https://');
+                if (isExternal) {
+                  return (
+                    <a key={idx} href={href} target="_blank" rel="noopener noreferrer" className="text-zinc-400 hover:text-white transition-colors font-light">
                       {menu.label}
                     </a>
                   );
@@ -265,7 +297,7 @@ export default function TenantWebsiteLayout({ children }) {
             &copy; {new Date().getFullYear()} {school.name}. {settings?.footer_text || 'Hak Cipta Dilindungi Undang-Undang.'}
           </p>
           <div className="flex gap-4 text-zinc-500">
-            <span>Powered by <strong className="text-zinc-400 font-extrabold">PAUDKU.ID</strong></span>
+            <span>Powered by <strong className="text-zinc-400 font-extrabold">koola.id</strong></span>
           </div>
         </div>
       </footer>

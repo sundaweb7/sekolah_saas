@@ -14,18 +14,33 @@ class JWTService
 
     public function __construct()
     {
-        $this->key = env('JWT_SECRET', 'paudku_secret_key_123456');
+        $this->key = self::resolveSecret();
         $this->algorithm = 'HS256';
         $this->expire = (int) env('JWT_EXPIRE', 3600); // 1 hour default
+    }
+
+    public static function resolveSecret(): string
+    {
+        $key = trim((string) env('JWT_SECRET', ''));
+        if (strlen($key) >= 32) {
+            return $key;
+        }
+
+        if (ENVIRONMENT === 'production') {
+            throw new \RuntimeException('JWT_SECRET must be configured with at least 32 characters.');
+        }
+
+        log_message('warning', 'Using development-only JWT secret. Configure JWT_SECRET before deployment.');
+        return 'development-only-change-before-production';
     }
 
     /**
      * Generate new JWT token for a user
      */
-    public function generateToken(array $userData): string
+    public function generateToken(array $userData, ?int $expireOverride = null): string
     {
         $issuedAt = time();
-        $expireTime = $issuedAt + $this->expire;
+        $expireTime = $issuedAt + ($expireOverride ?? $this->expire);
 
         $payload = array_merge([
             'iss' => base_url(),

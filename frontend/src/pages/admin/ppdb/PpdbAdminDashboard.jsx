@@ -1,8 +1,8 @@
 import { useState, useEffect } from 'react';
 import api from '../../../config/axios';
-import { 
-  Users, CheckCircle, Clock, AlertCircle, Eye, 
-  CreditCard, ShieldAlert, Loader2, Save 
+import {
+  Users, CheckCircle, Clock, AlertCircle, Eye,
+  CreditCard, ShieldAlert, Loader2, Save
 } from 'lucide-react';
 
 export default function PpdbAdminDashboard() {
@@ -10,14 +10,14 @@ export default function PpdbAdminDashboard() {
   const [settings, setSettings] = useState(null);
   const [loading, setLoading] = useState(true);
   const [stats, setStats] = useState({ total: 0, pending: 0, verified: 0, paid: 0 });
-  
+
   const [activeTab, setActiveTab] = useState('applicants'); // applicants / settings
-  
+
   // Settings Form state
   const [fee, setFee] = useState(0);
   const [isOpen, setIsOpen] = useState(false);
   const [instructions, setInstructions] = useState('');
-  
+
   // Verification Modal state
   const [selectedReg, setSelectedReg] = useState(null);
   const [verifyStatus, setVerifyStatus] = useState('verified');
@@ -58,8 +58,11 @@ export default function PpdbAdminDashboard() {
     fetchData();
   }, []);
 
+  const [saving, setSaving] = useState(false);
+
   const handleSaveSettings = async (e) => {
     e.preventDefault();
+    setSaving(true);
     try {
       await api.post('/admin/ppdb/settings', {
         registration_fee: Number(fee),
@@ -70,6 +73,8 @@ export default function PpdbAdminDashboard() {
       fetchData();
     } catch (error) {
       alert('Gagal menyimpan pengaturan.');
+    } finally {
+      setSaving(false);
     }
   };
 
@@ -105,7 +110,7 @@ export default function PpdbAdminDashboard() {
   if (loading) {
     return (
       <div className="flex min-h-screen items-center justify-center bg-[#f3f7f9] text-zinc-900">
-        <Loader2 className="h-8 w-8 animate-spin text-[#d4af37]" />
+        <Loader2 className="h-8 w-8 animate-spin text-[#d9a425]" />
       </div>
     );
   }
@@ -113,7 +118,7 @@ export default function PpdbAdminDashboard() {
   return (
     <div className="min-h-screen bg-[#f3f7f9] text-zinc-800 p-8">
       <div className="mx-auto max-w-6xl space-y-8">
-        
+
         {/* Header */}
         <div className="flex items-center justify-between">
           <div>
@@ -124,7 +129,7 @@ export default function PpdbAdminDashboard() {
             <button
               onClick={() => setActiveTab('applicants')}
               className={`rounded-md px-4 py-1.5 text-sm font-semibold transition-colors ${
-                activeTab === 'applicants' ? 'bg-[#d4af37] text-black' : 'text-zinc-500 hover:text-zinc-900'
+                activeTab === 'applicants' ? 'bg-[#d9a425] text-black' : 'text-zinc-500 hover:text-zinc-900'
               }`}
             >
               Pendaftar
@@ -132,7 +137,7 @@ export default function PpdbAdminDashboard() {
             <button
               onClick={() => setActiveTab('settings')}
               className={`rounded-md px-4 py-1.5 text-sm font-semibold transition-colors ${
-                activeTab === 'settings' ? 'bg-[#d4af37] text-black' : 'text-zinc-500 hover:text-zinc-900'
+                activeTab === 'settings' ? 'bg-[#d9a425] text-black' : 'text-zinc-500 hover:text-zinc-900'
               }`}
             >
               Konfigurasi
@@ -142,40 +147,40 @@ export default function PpdbAdminDashboard() {
 
         {/* Stats Grid */}
         <div className="grid grid-cols-2 md:grid-cols-4 gap-6">
-          <div className="rounded-xl border border-zinc-200 bg-white p-5 flex items-center gap-4 shadow-sm">
-            <div className="h-10 w-10 rounded-lg bg-indigo-500/10 text-indigo-400 flex items-center justify-center shrink-0">
+          <div className="bg-[#18181b] border border-zinc-900 rounded-xl p-5 flex items-center gap-4 hover:border-[#d9a425]/30 transition-all duration-300">
+            <div className="h-10 w-10 rounded-lg bg-zinc-900 border border-zinc-800 text-[#d9a425] flex items-center justify-center shrink-0">
               <Users className="h-5 w-5" />
             </div>
             <div>
-              <p className="text-2xl font-extrabold text-zinc-950">{stats.total}</p>
-              <p className="text-xs text-zinc-500">Total Pelamar</p>
+              <p className="text-2xl font-extrabold text-white">{stats.total}</p>
+              <p className="text-[10px] font-bold uppercase tracking-wider text-[#d9a425]">Total Pelamar</p>
             </div>
           </div>
-          <div className="rounded-xl border border-zinc-200 bg-white p-5 flex items-center gap-4 shadow-sm">
-            <div className="h-10 w-10 rounded-lg bg-yellow-500/10 text-yellow-400 flex items-center justify-center shrink-0">
+          <div className="bg-[#18181b] border border-zinc-900 rounded-xl p-5 flex items-center gap-4 hover:border-[#d9a425]/30 transition-all duration-300">
+            <div className="h-10 w-10 rounded-lg bg-zinc-900 border border-zinc-800 text-[#d9a425] flex items-center justify-center shrink-0">
               <Clock className="h-5 w-5" />
             </div>
             <div>
-              <p className="text-2xl font-extrabold text-zinc-950">{stats.pending}</p>
-              <p className="text-xs text-zinc-500">Menunggu Verifikasi</p>
+              <p className="text-2xl font-extrabold text-white">{stats.pending}</p>
+              <p className="text-[10px] font-bold uppercase tracking-wider text-[#d9a425]">Menunggu Verifikasi</p>
             </div>
           </div>
-          <div className="rounded-xl border border-zinc-200 bg-white p-5 flex items-center gap-4 shadow-sm">
-            <div className="h-10 w-10 rounded-lg bg-green-500/10 text-green-400 flex items-center justify-center shrink-0">
+          <div className="bg-[#18181b] border border-zinc-900 rounded-xl p-5 flex items-center gap-4 hover:border-[#d9a425]/30 transition-all duration-300">
+            <div className="h-10 w-10 rounded-lg bg-zinc-900 border border-zinc-800 text-[#d9a425] flex items-center justify-center shrink-0">
               <CheckCircle className="h-5 w-5" />
             </div>
             <div>
-              <p className="text-2xl font-extrabold text-zinc-950">{stats.verified}</p>
-              <p className="text-xs text-zinc-500">Diverifikasi / Diterima</p>
+              <p className="text-2xl font-extrabold text-white">{stats.verified}</p>
+              <p className="text-[10px] font-bold uppercase tracking-wider text-[#d9a425]">Diverifikasi / Diterima</p>
             </div>
           </div>
-          <div className="rounded-xl border border-zinc-200 bg-white p-5 flex items-center gap-4 shadow-sm">
-            <div className="h-10 w-10 rounded-lg bg-emerald-500/10 text-emerald-400 flex items-center justify-center shrink-0">
+          <div className="bg-[#18181b] border border-zinc-900 rounded-xl p-5 flex items-center gap-4 hover:border-[#d9a425]/30 transition-all duration-300">
+            <div className="h-10 w-10 rounded-lg bg-zinc-900 border border-zinc-800 text-[#d9a425] flex items-center justify-center shrink-0">
               <CreditCard className="h-5 w-5" />
             </div>
             <div>
-              <p className="text-2xl font-extrabold text-zinc-950">{stats.paid}</p>
-              <p className="text-xs text-zinc-500">Lunas Pembayaran</p>
+              <p className="text-2xl font-extrabold text-white">{stats.paid}</p>
+              <p className="text-[10px] font-bold uppercase tracking-wider text-[#d9a425]">Lunas Pembayaran</p>
             </div>
           </div>
         </div>
@@ -199,7 +204,7 @@ export default function PpdbAdminDashboard() {
                 <tbody className="divide-y divide-zinc-150">
                   {registrations.map((item) => (
                     <tr key={item.id} className="hover:bg-zinc-50 transition-colors">
-                      <td className="px-6 py-4 font-mono text-sm text-[#aa8410] font-bold">
+                      <td className="px-6 py-4 font-mono text-sm text-[#d9a425] font-bold">
                         {item.registration_number}
                       </td>
                       <td className="px-6 py-4 font-semibold text-zinc-950">{item.full_name}</td>
@@ -209,33 +214,35 @@ export default function PpdbAdminDashboard() {
                         <span className={`inline-block px-2.5 py-1 rounded-full text-xs font-semibold uppercase ${
                           item.status === 'accepted' ? 'bg-green-100 text-green-700' : item.status === 'rejected' ? 'bg-red-100 text-red-700' : 'bg-yellow-100 text-yellow-700'
                         }`}>
-                          {item.status}
+                          {item.status === 'accepted' ? 'Diterima' : item.status === 'rejected' ? 'Ditolak' : 'Menunggu'}
                         </span>
                       </td>
                       <td className="px-6 py-4">
                         <span className={`inline-block px-2.5 py-1 rounded-full text-xs font-semibold uppercase ${
-                          item.payment_status === 'paid' ? 'bg-emerald-100 text-emerald-700' : 'bg-red-100 text-red-700'
+                          item.payment_status === 'paid' ? 'bg-emerald-100 text-emerald-700' : 'bg-amber-100 text-amber-700'
                         }`}>
-                          {item.payment_status}
+                          {item.payment_status === 'paid' ? 'Lunas' : 'Belum Lunas'}
                         </span>
                       </td>
-                      <td className="px-6 py-4 text-right space-x-2">
-                        {item.payment_status === 'unpaid' && (
-                          <button 
-                            onClick={() => handleConfirmPayment(item.id)}
-                            className="p-1.5 text-zinc-400 hover:text-emerald-500 transition-colors"
-                            title="Konfirmasi Pembayaran Manual"
+                      <td className="px-6 py-4 text-right">
+                        <div className="flex items-center justify-end gap-1.5">
+                          {item.payment_status === 'unpaid' && (
+                            <button
+                              onClick={() => handleConfirmPayment(item.id)}
+                              className="p-1.5 text-zinc-400 hover:text-emerald-500 transition-colors"
+                              title="Konfirmasi Pembayaran Manual"
+                            >
+                              <CreditCard className="h-4 w-4" />
+                            </button>
+                          )}
+                          <button
+                            onClick={() => setSelectedReg(item)}
+                            className="p-1.5 text-zinc-400 hover:text-[#d9a425] transition-colors"
+                            title="Tinjau Berkas & Verifikasi"
                           >
-                            <CreditCard className="h-4 w-4" />
+                            <Eye className="h-4 w-4" />
                           </button>
-                        )}
-                        <button 
-                          onClick={() => setSelectedReg(item)}
-                          className="p-1.5 text-zinc-400 hover:text-[#d4af37] transition-colors"
-                          title="Tinjau Berkas & Verifikasi"
-                        >
-                          <Eye className="h-4 w-4" />
-                        </button>
+                        </div>
                       </td>
                     </tr>
                   ))}
@@ -244,96 +251,84 @@ export default function PpdbAdminDashboard() {
             </div>
           </div>
         ) : (
-          /* Settings Configurations */
           <form onSubmit={handleSaveSettings} className="rounded-2xl border border-zinc-200 bg-white p-6 shadow-sm space-y-6">
             <div className="flex items-center gap-3 border-b border-zinc-150 pb-3">
-              <ShieldAlert className="h-5 w-5 text-[#aa8410]" />
+              <ShieldAlert className="h-5 w-5 text-[#d9a425]" />
               <h2 className="text-xl font-bold text-zinc-950">Konfigurasi Penerimaan</h2>
             </div>
-
             <div className="grid grid-cols-1 sm:grid-cols-2 gap-6">
+              <div className="flex items-center gap-2">
+                <input
+                  type="checkbox"
+                  id="isOpen"
+                  checked={isOpen}
+                  onChange={(e) => setIsOpen(e.target.checked)}
+                  className="h-4 w-4 rounded border-zinc-250 bg-white text-[#d9a425] focus:ring-[#d9a425]"
+                />
+                <label htmlFor="isOpen" className="text-sm font-semibold text-zinc-700">Buka Pendaftaran PPDB Online</label>
+              </div>
               <div>
-                <label className="block text-sm font-bold text-zinc-650">Biaya Pendaftaran (Rp)</label>
+                <label className="block text-xs font-bold uppercase tracking-wider text-zinc-500">Biaya Pendaftaran (Rp)</label>
                 <input
                   type="number"
+                  required
                   value={fee}
                   onChange={(e) => setFee(e.target.value)}
-                  className="block w-full mt-2 rounded-xl border border-zinc-250 bg-white py-2.5 px-3.5 text-sm text-zinc-900 focus:border-[#d4af37] outline-none"
+                  placeholder="Contoh: 150000"
+                  className="block w-full mt-2 rounded-xl border border-zinc-250 bg-white py-2.5 px-3.5 text-sm text-zinc-900 focus:border-[#d9a425] outline-none"
                 />
               </div>
-
-              <div>
-                <label className="block text-sm font-bold text-zinc-650">Status Pendaftaran Online</label>
-                <label className="relative flex items-center gap-3 mt-4 cursor-pointer select-none">
-                  <input
-                    type="checkbox"
-                    checked={isOpen}
-                    onChange={(e) => setIsOpen(e.target.checked)}
-                    className="h-4 w-4 rounded border-zinc-250 bg-white text-[#d4af37] focus:ring-[#d4af37]"
-                  />
-                  <span className="text-sm font-semibold text-zinc-700">Buka Pendaftaran (Open PPDB)</span>
-                </label>
-              </div>
-
               <div className="sm:col-span-2">
-                <label className="block text-sm font-bold text-zinc-650">Instruksi Pembayaran (Rekening/Alur)</label>
+                <label className="block text-sm font-bold text-zinc-650">Instruksi Pembayaran</label>
                 <textarea
                   value={instructions}
                   onChange={(e) => setInstructions(e.target.value)}
                   rows="4"
-                  className="block w-full mt-2 rounded-xl border border-zinc-250 bg-white py-2.5 px-3.5 text-sm text-zinc-900 focus:border-[#d4af37] outline-none"
+                  className="block w-full mt-2 rounded-xl border border-zinc-250 bg-white py-2.5 px-3.5 text-sm text-zinc-900 focus:border-[#d9a425] outline-none"
                   placeholder="Masukkan instruksi pembayaran transfer bank, e-wallet, atau cash..."
                 />
               </div>
             </div>
-
-            <div className="pt-4 border-t border-zinc-150">
-              <button
-                type="submit"
-                className="flex items-center gap-2 rounded-xl bg-[#d4af37] px-5 py-2.5 text-xs font-bold text-black hover:bg-[#f3cb65] transition-colors"
-              >
-                <Save className="h-4 w-4" />
-                Simpan Konfigurasi PPDB
-              </button>
-            </div>
+            <button
+              type="submit"
+              disabled={saving}
+              className="flex items-center gap-2 rounded-xl bg-[#d9a425] px-5 py-2.5 text-xs font-bold text-black hover:bg-[#e5c158] transition-colors"
+            >
+              <Save className="h-4 w-4" />
+              Simpan Konfigurasi PPDB
+            </button>
           </form>
         )}
-
       </div>
 
-      {/* Verification Modal Popup */}
       {selectedReg && (
         <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/60 backdrop-blur-sm p-4">
           <div className="w-full max-w-lg rounded-2xl border border-zinc-200 bg-white p-6 space-y-6 shadow-2xl">
             <h3 className="text-xl font-bold text-zinc-950 border-b border-zinc-150 pb-3">Tinjau & Verifikasi Pendaftaran</h3>
-            
             <div className="text-sm text-zinc-700 space-y-1">
               <p><strong>Nama Anak:</strong> {selectedReg.full_name}</p>
               <p><strong>No. Pendaftaran:</strong> {selectedReg.registration_number}</p>
-              <p><strong>Nama Wali:</strong> {selectedReg.parent_name}</p>
             </div>
-
             <form onSubmit={handleVerifySubmit} className="space-y-4">
               <div>
-                <label className="block text-sm font-bold text-zinc-650">Status Kelulusan/Verifikasi</label>
+                <label className="block text-xs font-semibold text-zinc-550">Status Kelulusan</label>
                 <select
-                  value={verifyStatus}
-                  onChange={(e) => setVerifyStatus(e.target.value)}
-                  className="block w-full mt-1.5 rounded-xl border border-zinc-250 bg-white py-2 px-3 text-sm text-zinc-900 focus:border-[#d4af37] outline-none"
+                  value={status}
+                  onChange={(e) => setStatus(e.target.value)}
+                  className="block w-full mt-1.5 rounded-xl border border-zinc-250 bg-white py-2 px-3 text-sm text-zinc-900 focus:border-[#d9a425] outline-none"
                 >
-                  <option value="verified">Diverifikasi (Verified)</option>
-                  <option value="accepted">Diterima (Accepted)</option>
-                  <option value="rejected">Ditolak (Rejected)</option>
+                  <option value="pending">Menunggu</option>
+                  <option value="accepted">Diterima</option>
+                  <option value="rejected">Ditolak</option>
                 </select>
               </div>
-
               <div>
                 <label className="block text-sm font-bold text-zinc-650">Catatan Verifikator untuk Wali Murid</label>
                 <textarea
                   value={adminNotes}
                   onChange={(e) => setAdminNotes(e.target.value)}
                   rows="3"
-                  className="block w-full mt-1.5 rounded-xl border border-zinc-250 bg-white py-2 px-3 text-sm text-zinc-900 focus:border-[#d4af37] outline-none"
+                  className="block w-full mt-1.5 rounded-xl border border-zinc-250 bg-white py-2 px-3 text-sm text-zinc-900 focus:border-[#d9a425] outline-none"
                   placeholder="Tulis alasan jika ditolak, berkas kurang lengkap, atau ucapan selamat jika diterima..."
                 />
               </div>

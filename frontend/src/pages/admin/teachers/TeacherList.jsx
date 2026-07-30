@@ -55,10 +55,10 @@ export default function TeacherList() {
     setImpersonatingId(teacherId);
     try {
       const res = await api.post(`/admin/teachers/impersonate/${teacherId}`);
-      const { access_token, refresh_token, user } = res.data;
+      const { code } = res.data;
       const protocol = window.location.protocol;
       const host = window.location.host;
-      const redirectUrl = `${protocol}//${host}/login?sso_token=${access_token}&sso_refresh_token=${refresh_token}&sso_school_id=${user.school_id}&sso_role=${user.role}`;
+      const redirectUrl = `${protocol}//${host}/login?impersonation_code=${encodeURIComponent(code)}`;
       window.open(redirectUrl, '_blank');
     } catch (err) {
       alert(err.message || 'Gagal masuk sebagai guru.');

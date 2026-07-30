@@ -36,6 +36,10 @@ class Filters extends BaseFilters
         'performance'   => PerformanceMetrics::class,
         'tenant'        => \App\Filters\TenantFilter::class,
         'jwt_role'      => \App\Filters\JWTRoleAuthFilter::class,
+        'throttle'      => \App\Filters\RateLimitFilter::class,
+        'auditlog'      => \App\Filters\AuditLogFilter::class,
+        'feature'       => \App\Filters\FeatureGateFilter::class,
+        'subscription'  => \App\Filters\SubscriptionGuardFilter::class,
     ];
 
     /**
@@ -80,8 +84,8 @@ class Filters extends BaseFilters
             // 'invalidchars',
         ],
         'after' => [
-            // 'honeypot',
-            // 'secureheaders',
+            'secureheaders',
+            'auditlog',
         ],
     ];
 
@@ -109,5 +113,9 @@ class Filters extends BaseFilters
      *
      * @var array<string, array<string, list<string>>>
      */
-    public array $filters = [];
+    public array $filters = [
+        'subscription' => [
+            'before' => ['api/v1/admin/*', 'api/v1/teacher/*', 'api/v1/parent/*'],
+        ],
+    ];
 }

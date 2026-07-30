@@ -10,9 +10,11 @@ class WebsiteSettingModel extends BaseModel
     protected $returnType       = 'object';
     protected $protectFields    = true;
     protected $allowedFields    = [
-        'school_id', 'favicon', 'logo', 'theme_color', 'theme_template', 'menu_data', 
-        'google_maps_iframe', 'footer_text', 'contact_info', 
-        'hero_banner_image', 'slider_images', 'seo_title', 'seo_description'
+        'school_id', 'favicon', 'logo', 'letterhead_logo', 'theme_color', 'theme_template', 'menu_data',
+        'google_maps_iframe', 'footer_text', 'contact_info',
+        'payment_bank_name', 'payment_account_number', 'payment_account_name', 'bank_accounts', 'show_accreditation',
+        'hero_banner_image', 'slider_images', 'seo_title', 'seo_description',
+        'fonnte_token'
     ];
 
     // Dates

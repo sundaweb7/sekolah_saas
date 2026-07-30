@@ -10,7 +10,25 @@ export function AuthProvider({ children }) {
 
   // Silent refresh handler to get a new access token using refresh_token
   const refreshSession = useCallback(async () => {
-    const refreshToken = localStorage.getItem('refresh_token');
+    const existingAccessToken = sessionStorage.getItem('access_token');
+    const refreshToken = localStorage.getItem('refresh_token') || sessionStorage.getItem('refresh_token');
+
+    // 1. If we have an existing access token, try to load profile first
+    if (existingAccessToken) {
+      try {
+        const profileResponse = await api.get('/auth/profile', {
+          headers: { Authorization: `Bearer ${existingAccessToken}` }
+        });
+        setAccessToken(existingAccessToken);
+        setUser(profileResponse.data);
+        setLoading(false);
+        return existingAccessToken;
+      } catch (e) {
+        // Access token expired, proceed to refresh token exchange
+        console.log('Access token expired or invalid, attempting refresh');
+      }
+    }
+
     if (!refreshToken) {
       setLoading(false);
       return null;
@@ -18,12 +36,15 @@ export function AuthProvider({ children }) {
 
     try {
       const response = await api.post('/auth/refresh', { refresh_token: refreshToken });
-      const { access_token } = response.data;
+      const { access_token, refresh_token: newRefreshToken } = response.data;
       
       setAccessToken(access_token);
       sessionStorage.setItem('access_token', access_token);
+      if (newRefreshToken) {
+        const storage = localStorage.getItem('refresh_token') ? localStorage : sessionStorage;
+        storage.setItem('refresh_token', newRefreshToken);
+      }
       
-      // Fetch user profile using new access token (pass token in header override if state not updated yet)
       const profileResponse = await api.get('/auth/profile', {
         headers: { Authorization: `Bearer ${access_token}` }
       });
@@ -70,19 +91,20 @@ export function AuthProvider({ children }) {
         localStorage.setItem('refresh_token', refresh_token);
         localStorage.setItem('school_id', userData.school_id || '');
       } else {
-        localStorage.setItem('refresh_token', refresh_token);
-        localStorage.setItem('school_id', userData.school_id || '');
+        sessionStorage.setItem('refresh_token', refresh_token);
+        sessionStorage.setItem('school_id', userData.school_id || '');
       }
 
       return userData;
     } catch (error) {
-      setLoading(false);
       throw error;
+    } finally {
+      setLoading(false);
     }
   };
 
   const logout = async () => {
-    const refreshToken = localStorage.getItem('refresh_token');
+    const refreshToken = localStorage.getItem('refresh_token') || sessionStorage.getItem('refresh_token');
     try {
       if (refreshToken) {
         await api.post('/auth/logout', { refresh_token: refreshToken });
@@ -95,6 +117,8 @@ export function AuthProvider({ children }) {
       sessionStorage.removeItem('access_token');
       localStorage.removeItem('refresh_token');
       localStorage.removeItem('school_id');
+      sessionStorage.removeItem('refresh_token');
+      sessionStorage.removeItem('school_id');
       setLoading(false);
       window.location.href = '/login';
     }
@@ -118,7 +142,7 @@ export function AuthProvider({ children }) {
 
   // Auto-sync allowed_features every 2 minutes when user is logged in
   useEffect(() => {
-    if (!user || user.role === 'super_admin') return;
+    if (!user || user.role === 'superadmin') return;
     const interval = setInterval(() => {
       refreshProfile();
     }, 2 * 60 * 1000); // every 2 minutes

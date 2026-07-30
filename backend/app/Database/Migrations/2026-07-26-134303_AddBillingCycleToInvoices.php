@@ -8,6 +8,7 @@ class AddBillingCycleToInvoices extends Migration
 {
     public function up()
     {
+        if ($this->db->fieldExists('billing_cycle', 'invoices')) return;
         $fields = [
             'billing_cycle' => [
                 'type'       => 'VARCHAR',
@@ -22,6 +23,6 @@ class AddBillingCycleToInvoices extends Migration
 
     public function down()
     {
-        $this->forge->dropColumn('invoices', 'billing_cycle');
+        // Non-destructive reconciliation migration.
     }
 }

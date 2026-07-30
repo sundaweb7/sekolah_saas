@@ -1,0 +1,91 @@
+openapi: 3.0.3
+info:
+  title: Koola School SaaS API
+  version: 1.0.0
+  description: Kontrak inti API multi-tenant; host tenant wajib konsisten dengan school_id pada JWT.
+servers:
+  - url: https://{tenant}.example.com/api/v1
+    variables:
+      tenant: { default: demo }
+security:
+  - bearerAuth: []
+paths:
+  /health:
+    get:
+      security: []
+      summary: Health check aplikasi dan database
+      responses:
+        '200': { description: Sehat }
+        '503': { description: Database tidak tersedia }
+  /auth/login:
+    post:
+      security: []
+      summary: Login pada tenant dari host aktif
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [email, password]
+              properties:
+                email: { type: string, format: email }
+                password: { type: string, format: password }
+                remember_me: { type: boolean }
+      responses:
+        '200': { description: Token dan profil }
+        '401': { description: Kredensial tidak valid }
+  /auth/refresh:
+    post:
+      security: []
+      summary: Rotasi refresh token
+      responses:
+        '200': { description: Token baru }
+        '401': { description: Token tidak valid atau kedaluwarsa }
+  /auth/impersonation/exchange:
+    post:
+      security: []
+      summary: Tukarkan kode impersonasi sekali pakai pada tenant tujuan
+      responses:
+        '200': { description: Sesi impersonasi satu hari }
+        '401': { description: Kode tidak sah atau kedaluwarsa }
+  /admin/students:
+    get:
+      summary: Daftar siswa tenant
+      responses:
+        '200': { description: Daftar siswa }
+    post:
+      summary: Tambah siswa dengan pemeriksaan kuota paket
+      responses:
+        '201': { description: Siswa dibuat }
+        '403': { description: Kuota paket habis }
+  /billing/webhook:
+    post:
+      security: []
+      summary: Webhook Tripay bertanda tangan dan idempoten
+      responses:
+        '200': { description: Diproses atau sudah diproses }
+        '401': { description: Signature tidak valid }
+  /ppdb/register:
+    post:
+      security: []
+      summary: Pendaftaran PPDB publik saat fitur aktif
+      responses:
+        '201': { description: Pendaftaran diterima }
+        '403': { description: Fitur PPDB tidak aktif }
+  /parent/dashboard:
+    get:
+      summary: Data anak milik wali
+      parameters:
+        - in: query
+          name: student_id
+          schema: { type: integer }
+      responses:
+        '200': { description: Profil, laporan, kehadiran, pengumuman, dan tagihan }
+        '403': { description: Anak bukan milik akun }
+components:
+  securitySchemes:
+    bearerAuth:
+      type: http
+      scheme: bearer
+      bearerFormat: JWT

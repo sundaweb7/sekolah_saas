@@ -4,6 +4,7 @@ namespace App\Controllers\Admin;
 
 use App\Controllers\BaseResourceController;
 use App\Models\ClassModel;
+use App\Models\TeacherModel;
 use CodeIgniter\HTTP\ResponseInterface;
 
 class ClassController extends BaseResourceController
@@ -68,7 +69,10 @@ class ClassController extends BaseResourceController
      */
     public function create(): ResponseInterface
     {
-        $data = $this->request->getPost();
+        $data = $this->request->getVar();
+        if (!empty($data['teacher_id']) && !(new TeacherModel())->find($data['teacher_id'])) {
+            return $this->respondError('Teacher not found in this school', ResponseInterface::HTTP_BAD_REQUEST);
+        }
         
         $userPayload = $this->request->user ?? null;
         if ($userPayload) {
@@ -97,11 +101,14 @@ class ClassController extends BaseResourceController
             return $this->respondError('Class not found', ResponseInterface::HTTP_NOT_FOUND);
         }
 
-        $teacherIdRaw = $this->request->getPost('teacher_id');
+        $teacherIdRaw = $this->request->getVar('teacher_id');
+        if ($teacherIdRaw && !(new TeacherModel())->find($teacherIdRaw)) {
+            return $this->respondError('Teacher not found in this school', ResponseInterface::HTTP_BAD_REQUEST);
+        }
         
         $data = [
-            'name'       => $this->request->getPost('name'),
-            'age_group'  => $this->request->getPost('age_group'),
+            'name'       => $this->request->getVar('name'),
+            'age_group'  => $this->request->getVar('age_group'),
             'teacher_id' => ($teacherIdRaw !== null && $teacherIdRaw !== '') ? (int)$teacherIdRaw : null,
         ];
         
@@ -120,6 +127,7 @@ class ClassController extends BaseResourceController
                       ->select('classes.*, teachers.full_name AS teacher_name')
                       ->join('teachers', 'teachers.id = classes.teacher_id AND teachers.deleted_at IS NULL', 'left')
                       ->where('classes.id', $id)
+                      ->where('classes.school_id', defined('CURRENT_SCHOOL_ID') ? CURRENT_SCHOOL_ID : 0)
                       ->get()->getRowObject();
         return $this->respondSuccess($updated, 'Class updated successfully');
     }

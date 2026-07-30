@@ -3,9 +3,10 @@ import { useForm } from 'react-hook-form';
 import { zodResolver } from '@hookform/resolvers/zod';
 import * as z from 'zod';
 import api from '../../../config/axios';
-import { 
-  Palette, Phone, User, CheckCircle, AlertTriangle, 
-  Loader2, Globe, FileText, Image as ImageIcon, Calendar, Plus, Trash2, Edit, Upload, Sparkles, BookOpen, X
+import {
+  Palette, Phone, User, CheckCircle, AlertTriangle,
+  Loader2, Globe, FileText, Image as ImageIcon, Calendar, Plus, Trash2, Edit, Upload, Sparkles, BookOpen, X,
+  Check, Layers, Settings, CreditCard, Eye
 } from 'lucide-react';
 
 const websiteSchema = z.object({
@@ -15,31 +16,32 @@ const websiteSchema = z.object({
   googleMapsIframe: z.string().optional(),
   phone: z.string().optional(),
   email: z.string().optional(),
-  address: z.string().optional()
+  address: z.string().optional(),
+  postalCode: z.string().optional(),
+  paymentBankName: z.string().optional(),
+  paymentAccountNumber: z.string().optional(),
+  paymentAccountName: z.string().optional(),
+  fonnteToken: z.string().optional()
 });
 
 export default function WebsiteEditor() {
   const [activeTab, setActiveTab] = useState('tampilan');
   const [logoFile, setLogoFile] = useState(null);
+  const [letterheadLogoFile, setLetterheadLogoFile] = useState(null);
   const [faviconFile, setFaviconFile] = useState(null);
   const [bannerFile, setBannerFile] = useState(null);
-  
+
   const [loading, setLoading] = useState(true);
   const [success, setSuccess] = useState(false);
   const [error, setError] = useState(null);
 
-  // Content state (gallery, events)
-  const [contents, setContents] = useState([]);
-  const [contentLoading, setContentLoading] = useState(false);
-  const [showModal, setShowModal] = useState(false);
-  const [editingContent, setEditingContent] = useState(null);
+  // Custom Pages and Dynamic Menus States
+  const [pagesList, setPagesList] = useState([]);
+  const [pagesLoading, setPagesLoading] = useState(false);
+  const [menuItems, setMenuItems] = useState([]);
+  const [menuSaving, setMenuSaving] = useState(false);
 
-  // Content form state
-  const [contentTitle, setContentTitle] = useState('');
-  const [contentText, setContentText] = useState('');
-  const [contentDate, setContentDate] = useState('');
-  const [contentStatus, setContentStatus] = useState('published');
-  const [contentFile, setContentFile] = useState(null);
+
 
   // Homepage Profile Content State
   const [heroTagline, setHeroTagline] = useState('');
@@ -51,6 +53,29 @@ export default function WebsiteEditor() {
   const [ppdbText, setPpdbText] = useState('');
   const [principalPhotoFile, setPrincipalPhotoFile] = useState(null);
   const [profileSaving, setProfileSaving] = useState(false);
+
+  // Academic Settings States
+  const [academicYears, setAcademicYears] = useState([]);
+  const [semesters, setSemesters] = useState([]);
+  const [academicLoading, setAcademicLoading] = useState(false);
+
+  // Form Modals State
+  const [showYearModal, setShowYearModal] = useState(false);
+  const [showSemesterModal, setShowSemesterModal] = useState(false);
+  const [editingYear, setEditingYear] = useState(null);
+  const [editingSemester, setEditingSemester] = useState(null);
+
+  const [bankAccountsList, setBankAccountsList] = useState([{ bankName: '', accountNumber: '', accountName: '' }]);
+
+  // Year Form inputs
+  const [yearName, setYearName] = useState('');
+  const [yearIsActive, setYearIsActive] = useState(false);
+
+  // Semester Form inputs
+  const [semesterYearId, setSemesterYearId] = useState('');
+  const [semesterName, setSemesterName] = useState('Ganjil');
+  const [semesterStatus, setSemesterStatus] = useState('inactive');
+  const [academicSubmitLoading, setAcademicSubmitLoading] = useState(false);
 
   const {
     register,
@@ -73,12 +98,31 @@ export default function WebsiteEditor() {
         setValue('themeTemplate', settings.theme_template || 'ceria');
         setValue('footerText', settings.footer_text || '');
         setValue('googleMapsIframe', settings.google_maps_iframe || '');
-        
+        setMenuItems(settings.menu_data || []);
+
         const contacts = settings.contact_info;
         if (contacts) {
           setValue('phone', contacts.phone || '');
           setValue('email', contacts.email || '');
           setValue('address', contacts.address || '');
+          setValue('postalCode', contacts.postal_code || contacts.postalCode || '');
+        }
+
+        setValue('paymentBankName', settings.payment_bank_name || '');
+        setValue('paymentAccountNumber', settings.payment_account_number || '');
+        setValue('paymentAccountName', settings.payment_account_name || '');
+        setValue('fonnteToken', settings.fonnte_token || '');
+
+        if (settings.bank_accounts) {
+          setBankAccountsList(settings.bank_accounts);
+        } else if (settings.payment_bank_name) {
+          setBankAccountsList([{
+            bankName: settings.payment_bank_name,
+            accountNumber: settings.payment_account_number,
+            accountName: settings.payment_account_name
+          }]);
+        } else {
+          setBankAccountsList([{ bankName: '', accountNumber: '', accountName: '' }]);
         }
       }
 
@@ -98,15 +142,307 @@ export default function WebsiteEditor() {
     }
   };
 
-  const fetchContents = async (type) => {
-    setContentLoading(true);
+
+
+  const fetchAcademicData = async () => {
+    setAcademicLoading(true);
+    setError(null);
     try {
-      const response = await api.get(`/admin/website/contents?type=${type}`);
-      setContents(response.data.data || response.data);
+      const yearsRes = await api.get('/admin/academic-years');
+      const semestersRes = await api.get('/admin/semesters');
+
+      setAcademicYears(yearsRes.data || []);
+      setSemesters(semestersRes.data || []);
+
+      if (yearsRes.data?.length > 0 && !semesterYearId) {
+        setSemesterYearId(yearsRes.data[0].id);
+      }
     } catch (err) {
-      setError('Gagal memuat konten.');
+      console.error(err);
+      setError('Gagal memuat data akademik.');
     } finally {
-      setContentLoading(false);
+      setAcademicLoading(false);
+    }
+  };
+
+  // YEAR HANDLERS
+  const handleOpenAddYear = () => {
+    setEditingYear(null);
+    setYearName('');
+    setYearIsActive(false);
+    setShowYearModal(true);
+  };
+
+  const handleOpenEditYear = (year) => {
+    setEditingYear(year);
+    setYearName(year.name);
+    setYearIsActive(Number(year.is_active) === 1);
+    setShowYearModal(true);
+  };
+
+  const handleYearSubmit = async (e) => {
+    e.preventDefault();
+    if (!yearName.trim()) return;
+
+    setAcademicSubmitLoading(true);
+    try {
+      await api.post('/admin/academic-years/save', {
+        id: editingYear ? editingYear.id : undefined,
+        name: yearName.trim(),
+        is_active: yearIsActive ? 1 : 0
+      });
+      setShowYearModal(false);
+      fetchAcademicData();
+    } catch (err) {
+      console.error(err);
+      setError('Gagal menyimpan tahun ajaran.');
+    } finally {
+      setAcademicSubmitLoading(false);
+    }
+  };
+
+  const handleSetActiveYear = async (year) => {
+    try {
+      await api.post('/admin/academic-years/save', {
+        id: year.id,
+        name: year.name,
+        is_active: 1
+      });
+      fetchAcademicData();
+    } catch (err) {
+      console.error(err);
+      setError('Gagal mengaktifkan tahun ajaran.');
+    }
+  };
+
+  const handleDeleteYear = async (id) => {
+    if (!window.confirm('Apakah Anda yakin ingin menghapus Tahun Ajaran ini? Semua data kelas dan semester terikat mungkin akan terpengaruh.')) return;
+    try {
+      await api.delete(`/admin/academic-years/delete/${id}`);
+      fetchAcademicData();
+    } catch (err) {
+      console.error(err);
+      setError('Gagal menghapus Tahun Ajaran.');
+    }
+  };
+
+  // SEMESTER HANDLERS
+  const handleOpenAddSemester = () => {
+    setEditingSemester(null);
+    setSemesterName('Ganjil');
+    setSemesterStatus('inactive');
+    if (academicYears.length > 0) {
+      setSemesterYearId(academicYears[0].id);
+    }
+    setShowSemesterModal(true);
+  };
+
+  const handleOpenEditSemester = (semester) => {
+    setEditingSemester(semester);
+    setSemesterYearId(semester.academic_year_id);
+    setSemesterName(semester.name);
+    setSemesterStatus(semester.status);
+    setShowSemesterModal(true);
+  };
+
+  const handleSemesterSubmit = async (e) => {
+    e.preventDefault();
+    if (!semesterYearId || !semesterName) return;
+
+    setAcademicSubmitLoading(true);
+    try {
+      await api.post('/admin/semesters/save', {
+        id: editingSemester ? editingSemester.id : undefined,
+        academic_year_id: semesterYearId,
+        name: semesterName,
+        status: semesterStatus
+      });
+      setShowSemesterModal(false);
+      fetchAcademicData();
+    } catch (err) {
+      console.error(err);
+      setError('Gagal menyimpan semester.');
+    } finally {
+      setAcademicSubmitLoading(false);
+    }
+  };
+
+  const handleSetActiveSemester = async (semester) => {
+    try {
+      await api.post('/admin/semesters/save', {
+        id: semester.id,
+        academic_year_id: semester.academic_year_id,
+        name: semester.name,
+        status: 'active'
+      });
+      fetchAcademicData();
+    } catch (err) {
+      console.error(err);
+      setError('Gagal mengaktifkan semester.');
+    }
+  };
+
+  const handleDeleteSemester = async (id) => {
+    if (!window.confirm('Apakah Anda yakin ingin menghapus Semester ini?')) return;
+    try {
+      await api.delete(`/admin/semesters/delete/${id}`);
+      fetchAcademicData();
+    } catch (err) {
+      console.error(err);
+      setError('Gagal menghapus semester.');
+    }
+  };
+
+  const handleBankAccountChange = (index, field, value) => {
+    const updated = [...bankAccountsList];
+    updated[index][field] = value;
+    setBankAccountsList(updated);
+  };
+
+  const handleAddBankAccountRow = () => {
+    setBankAccountsList([...bankAccountsList, { bankName: '', accountNumber: '', accountName: '' }]);
+  };
+
+  const handleRemoveBankAccountRow = (index) => {
+    if (bankAccountsList.length === 1) {
+      setBankAccountsList([{ bankName: '', accountNumber: '', accountName: '' }]);
+    } else {
+      setBankAccountsList(bankAccountsList.filter((_, i) => i !== index));
+    }
+  };
+
+  // CUSTOM PAGES & MENUS HANDLERS
+  const fetchPages = async () => {
+    setPagesLoading(true);
+    setError(null);
+    try {
+      const response = await api.get('/admin/website/pages');
+      setPagesList(response.data || []);
+    } catch (err) {
+      console.error(err);
+      setError('Gagal memuat daftar halaman kustom.');
+    } finally {
+      setPagesLoading(false);
+    }
+  };
+
+  const [showPageModal, setShowPageModal] = useState(false);
+  const [editingPage, setEditingPage] = useState(null);
+  const [pageTitle, setPageTitle] = useState('');
+  const [pageContent, setPageContent] = useState('');
+  const [pageStatus, setPageStatus] = useState('published');
+  const [pageSubmitLoading, setPageSubmitLoading] = useState(false);
+
+  const handleOpenAddPage = () => {
+    setEditingPage(null);
+    setPageTitle('');
+    setPageContent('');
+    setPageStatus('published');
+    setShowPageModal(true);
+  };
+
+  const handleOpenEditPage = (page) => {
+    setEditingPage(page);
+    setPageTitle(page.title);
+    setPageContent(page.content || '');
+    setPageStatus(page.status || 'published');
+    setShowPageModal(true);
+  };
+
+  const handlePageSubmit = async (e) => {
+    e.preventDefault();
+    if (!pageTitle.trim()) return;
+
+    setPageSubmitLoading(true);
+    try {
+      if (editingPage) {
+        await api.post(`/admin/website/pages/update/${editingPage.id}`, {
+          title: pageTitle.trim(),
+          content: pageContent,
+          status: pageStatus
+        });
+      } else {
+        await api.post('/admin/website/pages', {
+          title: pageTitle.trim(),
+          content: pageContent,
+          status: pageStatus
+        });
+      }
+      setShowPageModal(false);
+      fetchPages();
+      setSuccess(true);
+    } catch (err) {
+      console.error(err);
+      setError('Gagal menyimpan halaman kustom.');
+    } finally {
+      setPageSubmitLoading(false);
+    }
+  };
+
+  const handleDeletePage = async (id) => {
+    if (!window.confirm('Apakah Anda yakin ingin menghapus halaman kustom ini?')) return;
+    try {
+      await api.delete(`/admin/website/pages/delete/${id}`);
+      fetchPages();
+      setSuccess(true);
+    } catch (err) {
+      console.error(err);
+      setError('Gagal menghapus halaman kustom.');
+    }
+  };
+
+  // CUSTOM MENU HANDLERS
+  const [newMenuLabel, setNewMenuLabel] = useState('');
+  const [newMenuType, setNewMenuType] = useState('built_in');
+  const [newMenuValue, setNewMenuValue] = useState('#home');
+
+  const handleAddMenuItem = () => {
+    if (!newMenuLabel.trim()) return;
+    const newItem = {
+      label: newMenuLabel.trim(),
+      type: newMenuType,
+      value: newMenuValue
+    };
+    setMenuItems([...menuItems, newItem]);
+    setNewMenuLabel('');
+    setNewMenuType('built_in');
+    setNewMenuValue('#home');
+  };
+
+  const handleRemoveMenuItem = (index) => {
+    setMenuItems(menuItems.filter((_, i) => i !== index));
+  };
+
+  const handleMoveMenuItem = (index, direction) => {
+    const nextItems = [...menuItems];
+    const targetIndex = index + direction;
+    if (targetIndex < 0 || targetIndex >= nextItems.length) return;
+
+    // Swap
+    const temp = nextItems[index];
+    nextItems[index] = nextItems[targetIndex];
+    nextItems[targetIndex] = temp;
+    setMenuItems(nextItems);
+  };
+
+  const handleSaveMenus = async () => {
+    setMenuSaving(true);
+    setError(null);
+    setSuccess(false);
+    try {
+      const formData = new FormData();
+      formData.append('menu_data', JSON.stringify(menuItems));
+
+      await api.post('/admin/website/settings', formData, {
+        headers: { 'Content-Type': 'multipart/form-data' }
+      });
+      setSuccess(true);
+      fetchSettings();
+    } catch (err) {
+      console.error(err);
+      setError('Gagal menyimpan susunan menu.');
+    } finally {
+      setMenuSaving(false);
     }
   };
 
@@ -115,32 +451,39 @@ export default function WebsiteEditor() {
   }, [setValue]);
 
   useEffect(() => {
-    if (activeTab !== 'tampilan' && activeTab !== 'konten_utama') {
-      let contentType = 'news';
-      if (activeTab === 'galeri') contentType = 'gallery';
-      if (activeTab === 'agenda') contentType = 'event';
-      fetchContents(contentType);
+    if (activeTab === 'tahun_ajaran') {
+      fetchAcademicData();
+    } else if (activeTab === 'custom_pages' || activeTab === 'custom_menus') {
+      fetchPages();
     }
   }, [activeTab]);
 
   const onSettingsSubmit = async (data) => {
     setSuccess(false);
     setError(null);
-    
+
     const formData = new FormData();
     formData.append('theme_color', data.themeColor);
     formData.append('theme_template', data.themeTemplate);
     formData.append('footer_text', data.footerText);
     formData.append('google_maps_iframe', data.googleMapsIframe);
-    
+
     const contactInfo = {
       phone: data.phone,
       email: data.email,
-      address: data.address
+      address: data.address,
+      postal_code: data.postalCode
     };
     formData.append('contact_info', JSON.stringify(contactInfo));
 
+    formData.append('payment_bank_name', data.paymentBankName || '');
+    formData.append('payment_account_number', data.paymentAccountNumber || '');
+    formData.append('payment_account_name', data.paymentAccountName || '');
+    formData.append('bank_accounts', JSON.stringify(bankAccountsList));
+    formData.append('fonnte_token', data.fonnteToken || '');
+
     if (logoFile) formData.append('logo_file', logoFile);
+    if (letterheadLogoFile) formData.append('letterhead_logo_file', letterheadLogoFile);
     if (faviconFile) formData.append('favicon_file', faviconFile);
     if (bannerFile) formData.append('banner_file', bannerFile);
 
@@ -187,76 +530,7 @@ export default function WebsiteEditor() {
     }
   };
 
-  const handleContentSubmit = async (e) => {
-    e.preventDefault();
-    let contentType = 'gallery';
-    if (activeTab === 'agenda') contentType = 'event';
 
-    const formData = new FormData();
-    formData.append('type', contentType);
-    formData.append('title', contentTitle);
-    formData.append('content', contentText);
-    formData.append('status', contentStatus);
-
-    if (contentDate) {
-      formData.append('event_date', contentDate);
-    }
-    if (contentFile) {
-      formData.append('image_file', contentFile);
-    }
-
-    try {
-      if (editingContent) {
-        await api.post(`/admin/website/contents/update/${editingContent.id}`, formData, {
-          headers: { 'Content-Type': 'multipart/form-data' }
-        });
-      } else {
-        await api.post('/admin/website/contents', formData, {
-          headers: { 'Content-Type': 'multipart/form-data' }
-        });
-      }
-      setShowModal(false);
-      resetContentForm();
-      fetchContents(contentType);
-    } catch (err) {
-      setError('Gagal menyimpan konten.');
-    }
-  };
-
-  const handleDeleteContent = async (id) => {
-    if (!confirm('Apakah Anda yakin ingin menghapus konten ini?')) return;
-    try {
-      await api.delete(`/admin/website/contents/delete/${id}`);
-      let contentType = 'gallery';
-      if (activeTab === 'agenda') contentType = 'event';
-      fetchContents(contentType);
-    } catch (err) {
-      setError('Gagal menghapus konten.');
-    }
-  };
-
-  const openAddModal = () => {
-    resetContentForm();
-    setEditingContent(null);
-    setShowModal(true);
-  };
-
-  const openEditModal = (item) => {
-    setEditingContent(item);
-    setContentTitle(item.title);
-    setContentText(item.content || '');
-    setContentDate(item.event_date || '');
-    setContentStatus(item.status || 'published');
-    setShowModal(true);
-  };
-
-  const resetContentForm = () => {
-    setContentTitle('');
-    setContentText('');
-    setContentDate('');
-    setContentStatus('published');
-    setContentFile(null);
-  };
 
   if (loading) {
     return (
@@ -269,44 +543,56 @@ export default function WebsiteEditor() {
   return (
     <div className="p-6 lg:p-8 text-zinc-800">
       <div className="space-y-6">
-        
+
         {/* Header */}
         <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4">
           <div>
             <h1 className="text-3xl font-extrabold tracking-tight text-zinc-950 flex items-center gap-2">
-              <Globe className="h-8 w-8 text-[#aa8410]" /> Website Builder
+              <Settings className="h-8 w-8 text-[#aa8410]" /> Website Setting
             </h1>
             <p className="mt-1 text-sm text-zinc-550">
-              Kelola pengaturan tampilan, logo, konten halaman utama, berita, dan galeri sekolah Anda secara dinamis.
+              Kelola pengaturan tampilan, logo, konten halaman utama, berita, galeri, serta konfigurasi tahun ajaran sekolah Anda secara dinamis.
             </p>
           </div>
         </div>
 
         {/* Tabs Controller */}
         <div className="flex border-b border-zinc-200 gap-2 overflow-x-auto pb-1">
-          <button 
+          <button
             onClick={() => setActiveTab('tampilan')}
             className={`px-4 py-2 text-sm font-semibold border-b-2 transition-all flex items-center gap-1.5 shrink-0 ${activeTab === 'tampilan' ? 'border-[#d4af37] text-zinc-900' : 'border-transparent text-zinc-500 hover:text-zinc-900'}`}
           >
             <Palette className="h-4 w-4" /> Desain & Tampilan
           </button>
-          <button 
+          <button
             onClick={() => setActiveTab('konten_utama')}
             className={`px-4 py-2 text-sm font-semibold border-b-2 transition-all flex items-center gap-1.5 shrink-0 ${activeTab === 'konten_utama' ? 'border-[#d4af37] text-zinc-900' : 'border-transparent text-zinc-500 hover:text-zinc-900'}`}
           >
             <BookOpen className="h-4 w-4" /> Konten Halaman Utama
           </button>
-          <button 
-            onClick={() => setActiveTab('galeri')}
-            className={`px-4 py-2 text-sm font-semibold border-b-2 transition-all flex items-center gap-1.5 shrink-0 ${activeTab === 'galeri' ? 'border-[#d4af37] text-zinc-900' : 'border-transparent text-zinc-500 hover:text-zinc-900'}`}
+          <button
+            onClick={() => setActiveTab('tahun_ajaran')}
+            className={`px-4 py-2 text-sm font-semibold border-b-2 transition-all flex items-center gap-1.5 shrink-0 ${activeTab === 'tahun_ajaran' ? 'border-[#d4af37] text-zinc-900' : 'border-transparent text-zinc-500 hover:text-zinc-900'}`}
           >
-            <ImageIcon className="h-4 w-4" /> Galeri Foto
+            <Calendar className="h-4 w-4" /> Tahun Ajaran &amp; Semester
           </button>
-          <button 
-            onClick={() => setActiveTab('agenda')}
-            className={`px-4 py-2 text-sm font-semibold border-b-2 transition-all flex items-center gap-1.5 shrink-0 ${activeTab === 'agenda' ? 'border-[#d4af37] text-zinc-900' : 'border-transparent text-zinc-500 hover:text-zinc-900'}`}
+          <button
+            onClick={() => setActiveTab('rekening')}
+            className={`px-4 py-2 text-sm font-semibold border-b-2 transition-all flex items-center gap-1.5 shrink-0 ${activeTab === 'rekening' ? 'border-[#d4af37] text-zinc-900' : 'border-transparent text-zinc-500 hover:text-zinc-900'}`}
           >
-            <Calendar className="h-4 w-4" /> Agenda Kegiatan
+            <CreditCard className="h-4 w-4" /> Rekening Pembayaran
+          </button>
+          <button
+            onClick={() => setActiveTab('custom_pages')}
+            className={`px-4 py-2 text-sm font-semibold border-b-2 transition-all flex items-center gap-1.5 shrink-0 ${activeTab === 'custom_pages' ? 'border-[#d4af37] text-zinc-900' : 'border-transparent text-zinc-500 hover:text-zinc-900'}`}
+          >
+            <Layers className="h-4 w-4" /> Halaman Kustom
+          </button>
+          <button
+            onClick={() => setActiveTab('custom_menus')}
+            className={`px-4 py-2 text-sm font-semibold border-b-2 transition-all flex items-center gap-1.5 shrink-0 ${activeTab === 'custom_menus' ? 'border-[#d4af37] text-zinc-900' : 'border-transparent text-zinc-500 hover:text-zinc-900'}`}
+          >
+            <Globe className="h-4 w-4" /> Menu Navigasi
           </button>
         </div>
 
@@ -360,19 +646,34 @@ export default function WebsiteEditor() {
                     {...register('themeTemplate')}
                     className="block w-full mt-2 rounded-lg border border-zinc-800 bg-zinc-950 py-2.5 px-3 text-sm text-white focus:border-[#d4af37] outline-none"
                   >
-                    <option value="ceria">Playful Ceria (TK/PAUD)</option>
-                    <option value="modern">Modern Sleek</option>
+                    <option value="ceria">TK</option>
+                    <option value="sd">SD</option>
+                    <option value="smp">SMP</option>
+                    <option value="sma">SMA</option>
+                    <option value="smk">SMK</option>
+                    <option value="pesantren">Pesantren</option>
+                    <option value="mts">MTS</option>
+                    <option value="ma">MA</option>
                   </select>
                 </div>
               </div>
 
-              <div className="grid grid-cols-1 sm:grid-cols-3 gap-6 pt-4">
+              <div className="grid grid-cols-1 sm:grid-cols-4 gap-6 pt-4">
                 <div>
-                  <label className="block text-sm font-medium text-zinc-300">Logo Sekolah</label>
+                  <label className="block text-sm font-medium text-zinc-300">Logo Website</label>
                   <input
                     type="file"
                     accept="image/*"
                     onChange={(e) => setLogoFile(e.target.files?.[0] || null)}
+                    className="block w-full mt-2 text-xs text-zinc-400"
+                  />
+                </div>
+                <div>
+                  <label className="block text-sm font-medium text-zinc-300">Logo KOP Surat</label>
+                  <input
+                    type="file"
+                    accept="image/*"
+                    onChange={(e) => setLetterheadLogoFile(e.target.files?.[0] || null)}
                     className="block w-full mt-2 text-xs text-zinc-400"
                   />
                 </div>
@@ -455,6 +756,16 @@ export default function WebsiteEditor() {
                 </div>
 
                 <div>
+                  <label className="block text-xs font-semibold uppercase text-zinc-400">Kode Pos</label>
+                  <input
+                    type="text"
+                    {...register('postalCode')}
+                    placeholder="12345"
+                    className="block w-full mt-1.5 rounded-lg border border-zinc-800 bg-zinc-950 py-2.5 px-3 text-sm text-white focus:border-[#d4af37] outline-none"
+                  />
+                </div>
+
+                <div>
                   <label className="block text-xs font-semibold uppercase text-zinc-400">Alamat Lengkap</label>
                   <textarea
                     rows="3"
@@ -462,6 +773,17 @@ export default function WebsiteEditor() {
                     placeholder="Jl. Raya Merdeka No. 45..."
                     className="block w-full mt-1.5 rounded-lg border border-zinc-800 bg-zinc-950 py-2.5 px-3 text-sm text-white focus:border-[#d4af37] outline-none"
                   />
+                </div>
+
+                <div className="border-t border-zinc-800 pt-4 mt-4">
+                  <label className="block text-xs font-semibold uppercase text-[#d4af37]">Fonnte WhatsApp Token (Khusus Sekolah)</label>
+                  <input
+                    type="text"
+                    {...register('fonnteToken')}
+                    placeholder="Masukkan token Fonnte Anda..."
+                    className="block w-full mt-1.5 rounded-lg border border-zinc-700 bg-zinc-950 py-2.5 px-3 text-sm text-white focus:border-[#d4af37] outline-none font-mono"
+                  />
+                  <p className="text-[10px] text-zinc-400 mt-1">Kosongkan jika ingin menggunakan token default sistem.</p>
                 </div>
               </div>
             </div>
@@ -582,200 +904,718 @@ export default function WebsiteEditor() {
           </form>
         )}
 
-        {/* Tab 3: Galeri Foto */}
-        {activeTab === 'galeri' && (
-          <div className="rounded-2xl border border-zinc-200 bg-white p-6 shadow-sm space-y-6">
-            <div className="flex items-center justify-between border-b border-zinc-150 pb-3">
-              <div className="flex items-center gap-3">
-                <ImageIcon className="h-5 w-5 text-[#aa8410]" />
-                <h2 className="text-xl font-bold text-zinc-950">Galeri Foto Kegiatan</h2>
-              </div>
-              <button 
-                onClick={openAddModal}
-                className="rounded-xl bg-[#d4af37] hover:bg-[#f3cb65] px-4 py-2 text-xs font-bold text-black flex items-center gap-1.5 transition-colors"
-              >
-                <Plus className="h-4 w-4" /> Tambah Foto
-              </button>
-            </div>
+        {/* Tab 5: Tahun Ajaran & Semester */}
+        {activeTab === 'tahun_ajaran' && (
+          <div className="space-y-6">
+            <div className="grid md:grid-cols-2 gap-8 items-start">
 
-            {contentLoading ? (
-              <div className="flex justify-center py-10">
-                <Loader2 className="h-8 w-8 animate-spin text-[#d4af37]" />
-              </div>
-            ) : contents.length === 0 ? (
-              <p className="text-zinc-500 text-sm text-center py-10">Belum ada foto galeri.</p>
-            ) : (
-              <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 gap-6">
-                {contents.map((item) => (
-                  <div key={item.id} className="rounded-2xl border border-zinc-200 bg-white overflow-hidden flex flex-col justify-between shadow-sm hover:shadow-md transition-shadow">
-                    <div>
-                      {item.image && (
-                        <img 
-                          src={`http://${window.location.hostname}:8080/${item.image}`} 
-                          alt="" 
-                          className="h-40 w-full object-cover border-b border-zinc-150" 
-                        />
+              {/* Tahun Ajaran Card */}
+              <div className="bg-white border border-zinc-200/80 rounded-2xl p-6 shadow-sm space-y-4">
+                <div className="flex justify-between items-center border-b border-zinc-150 pb-3">
+                  <h3 className="font-extrabold text-zinc-800 text-sm flex items-center gap-2">
+                    <Calendar className="h-5 w-5 text-[#d4af37]" />
+                    Daftar Tahun Ajaran
+                  </h3>
+                  <button
+                    onClick={handleOpenAddYear}
+                    className="text-[10px] font-bold bg-[#d4af37] hover:bg-[#f3cb65] text-black px-3 py-1.5 rounded-lg flex items-center gap-1 transition-all"
+                  >
+                    <Plus className="h-3 w-3" /> Tambah
+                  </button>
+                </div>
+
+                <div className="overflow-x-auto rounded-xl border border-zinc-150">
+                  <table className="w-full text-left border-collapse text-xs">
+                    <thead>
+                      <tr className="bg-zinc-50 border-b border-zinc-150 text-[10px] font-extrabold text-zinc-450 uppercase tracking-widest">
+                        <th className="px-4 py-3">Tahun Ajaran</th>
+                        <th className="px-4 py-3 text-center">Status</th>
+                        <th className="px-4 py-3 text-center">Aksi</th>
+                      </tr>
+                    </thead>
+                    <tbody className="divide-y divide-zinc-100">
+                      {academicYears.length === 0 ? (
+                        <tr>
+                          <td colSpan="3" className="px-4 py-6 text-center text-zinc-450 italic">Belum ada tahun ajaran.</td>
+                        </tr>
+                      ) : (
+                        academicYears.map(year => (
+                          <tr key={year.id} className="hover:bg-zinc-50/50">
+                            <td className="px-4 py-3.5 font-bold text-zinc-800">{year.name}</td>
+                            <td className="px-4 py-3.5 text-center">
+                              {Number(year.is_active) === 1 ? (
+                                <span className="inline-block px-2.5 py-0.5 rounded-full text-[9px] font-bold bg-emerald-100 text-emerald-800 uppercase tracking-wider">Aktif</span>
+                              ) : (
+                                <span className="inline-block px-2.5 py-0.5 rounded-full text-[9px] font-bold bg-zinc-100 text-zinc-500 uppercase tracking-wider">Nonaktif</span>
+                              )}
+                            </td>
+                            <td className="px-4 py-3.5 text-center">
+                              <div className="flex justify-center items-center gap-2">
+                                {Number(year.is_active) !== 1 && (
+                                  <button
+                                    onClick={() => handleSetActiveYear(year)}
+                                    title="Set Aktif"
+                                    className="p-1 text-emerald-600 hover:bg-emerald-50 rounded border border-emerald-250 transition-colors"
+                                  >
+                                    <Check className="h-3.5 w-3.5" />
+                                  </button>
+                                )}
+                                <button
+                                  onClick={() => handleOpenEditYear(year)}
+                                  title="Edit"
+                                  className="p-1 text-zinc-600 hover:bg-zinc-50 border border-zinc-200 rounded transition-colors"
+                                >
+                                  <Edit className="h-3.5 w-3.5" />
+                                </button>
+                                <button
+                                  onClick={() => handleDeleteYear(year.id)}
+                                  title="Hapus"
+                                  className="p-1 text-red-500 hover:bg-red-50 border border-red-200 rounded transition-colors"
+                                >
+                                  <Trash2 className="h-3.5 w-3.5" />
+                                </button>
+                              </div>
+                            </td>
+                          </tr>
+                        ))
                       )}
-                      <div className="p-4 space-y-1">
-                        <h4 className="font-bold text-sm text-zinc-900">{item.title}</h4>
-                        <p className="text-xs text-zinc-500 line-clamp-2">{item.content}</p>
-                      </div>
+                    </tbody>
+                  </table>
+                </div>
+              </div>
+
+              {/* Semester Card */}
+              <div className="bg-white border border-zinc-200/80 rounded-2xl p-6 shadow-sm space-y-4">
+                <div className="flex justify-between items-center border-b border-zinc-150 pb-3">
+                  <h3 className="font-extrabold text-zinc-800 text-sm flex items-center gap-2">
+                    <Calendar className="h-5 w-5 text-[#d4af37]" />
+                    Daftar Semester
+                  </h3>
+                  <button
+                    onClick={handleOpenAddSemester}
+                    className="text-[10px] font-bold bg-[#d4af37] hover:bg-[#f3cb65] text-black px-3 py-1.5 rounded-lg flex items-center gap-1 transition-all"
+                  >
+                    <Plus className="h-3 w-3" /> Tambah
+                  </button>
+                </div>
+
+                <div className="overflow-x-auto rounded-xl border border-zinc-150">
+                  <table className="w-full text-left border-collapse text-xs">
+                    <thead>
+                      <tr className="bg-zinc-50 border-b border-zinc-150 text-[10px] font-extrabold text-zinc-450 uppercase tracking-widest">
+                        <th className="px-4 py-3">Tahun Ajaran</th>
+                        <th className="px-4 py-3">Semester</th>
+                        <th className="px-4 py-3 text-center">Status</th>
+                        <th className="px-4 py-3 text-center">Aksi</th>
+                      </tr>
+                    </thead>
+                    <tbody className="divide-y divide-zinc-100">
+                      {semesters.length === 0 ? (
+                        <tr>
+                          <td colSpan="4" className="px-4 py-6 text-center text-zinc-455 italic">Belum ada data semester.</td>
+                        </tr>
+                      ) : (
+                        semesters.map(semester => {
+                          const yearObj = academicYears.find(y => y.id === semester.academic_year_id);
+                          return (
+                            <tr key={semester.id} className="hover:bg-zinc-50/50">
+                              <td className="px-4 py-3.5 text-zinc-650 font-medium">{yearObj ? yearObj.name : 'Unknown'}</td>
+                              <td className="px-4 py-3.5 font-bold text-zinc-800">Semester {semester.name}</td>
+                              <td className="px-4 py-3.5 text-center">
+                                {semester.status === 'active' ? (
+                                  <span className="inline-block px-2.5 py-0.5 rounded-full text-[9px] font-bold bg-emerald-100 text-emerald-800 uppercase tracking-wider">Aktif</span>
+                                ) : (
+                                  <span className="inline-block px-2.5 py-0.5 rounded-full text-[9px] font-bold bg-zinc-100 text-zinc-500 uppercase tracking-wider">Nonaktif</span>
+                                )}
+                              </td>
+                              <td className="px-4 py-3.5 text-center">
+                                <div className="flex justify-center items-center gap-2">
+                                  {semester.status !== 'active' && (
+                                    <button
+                                      onClick={() => handleSetActiveSemester(semester)}
+                                      title="Set Aktif"
+                                      className="p-1 text-emerald-600 hover:bg-emerald-50 rounded border border-emerald-250 transition-colors"
+                                    >
+                                      <Check className="h-3.5 w-3.5" />
+                                    </button>
+                                  )}
+                                  <button
+                                    onClick={() => handleOpenEditSemester(semester)}
+                                    title="Edit"
+                                    className="p-1 text-zinc-600 hover:bg-zinc-50 border border-zinc-200 rounded transition-colors"
+                                  >
+                                    <Edit className="h-3.5 w-3.5" />
+                                  </button>
+                                  <button
+                                    onClick={() => handleDeleteSemester(semester.id)}
+                                    title="Hapus"
+                                    className="p-1 text-red-500 hover:bg-red-50 border border-red-200 rounded transition-colors"
+                                  >
+                                    <Trash2 className="h-3.5 w-3.5" />
+                                  </button>
+                                </div>
+                              </td>
+                            </tr>
+                          );
+                        })
+                      )}
+                    </tbody>
+                  </table>
+                </div>
+              </div>
+
+            </div>
+          </div>
+        )}
+
+        {/* Tab 6: Rekening Pembayaran */}
+        {activeTab === 'rekening' && (
+          <form onSubmit={handleSubmit(onSettingsSubmit)} className="space-y-6">
+            <div className="bg-white border border-zinc-200/80 rounded-2xl p-6 shadow-sm space-y-6">
+              <div className="flex justify-between items-center border-b border-zinc-150 pb-3">
+                <div className="flex items-center gap-3">
+                  <CreditCard className="h-5 w-5 text-[#d4af37]" />
+                  <div>
+                    <h2 className="text-sm font-extrabold text-zinc-800">Daftar Rekening Bank Sekolah</h2>
+                    <p className="text-[10px] text-zinc-400 mt-0.5">Kelola daftar rekening bank resmi sekolah Anda untuk penerimaan iuran SPP, ekskul, dll.</p>
+                  </div>
+                </div>
+                <button
+                  type="button"
+                  onClick={handleAddBankAccountRow}
+                  className="rounded-lg bg-[#d4af37] hover:bg-[#f3cb65] text-black px-3 py-1.5 text-[10px] font-extrabold flex items-center gap-1 transition-all shadow-sm"
+                >
+                  + Tambah Rekening
+                </button>
+              </div>
+
+              <div className="space-y-4">
+                {bankAccountsList.map((acc, index) => (
+                  <div key={index} className="grid grid-cols-1 md:grid-cols-12 gap-4 items-end bg-zinc-50/50 p-4 rounded-xl border border-zinc-150 text-xs">
+                    <div className="md:col-span-3 space-y-1">
+                      <label className="block font-bold text-zinc-450 uppercase tracking-wider text-[9px]">Nama Bank</label>
+                      <input
+                        type="text"
+                        required
+                        value={acc.bankName || ''}
+                        onChange={(e) => handleBankAccountChange(index, 'bankName', e.target.value)}
+                        placeholder="Contoh: BNI, Mandiri, BRI"
+                        className="block w-full rounded-xl border border-zinc-300 py-2 px-3 focus:border-[#d4af37] outline-none text-zinc-700 font-medium bg-white"
+                      />
                     </div>
 
-                    <div className="p-4 border-t border-zinc-100 flex justify-end gap-2">
-                      <button 
-                        onClick={() => openEditModal(item)}
-                        className="p-1.5 text-zinc-400 hover:text-[#d4af37] transition-colors"
+                    <div className="md:col-span-4 space-y-1">
+                      <label className="block font-bold text-zinc-450 uppercase tracking-wider text-[9px]">Nomor Rekening</label>
+                      <input
+                        type="text"
+                        required
+                        value={acc.accountNumber || ''}
+                        onChange={(e) => handleBankAccountChange(index, 'accountNumber', e.target.value)}
+                        placeholder="Contoh: 123456789"
+                        className="block w-full rounded-xl border border-zinc-300 py-2 px-3 focus:border-[#d4af37] outline-none text-zinc-700 font-medium bg-white"
+                      />
+                    </div>
+
+                    <div className="md:col-span-4 space-y-1">
+                      <label className="block font-bold text-zinc-450 uppercase tracking-wider text-[9px]">Atas Nama Pemilik</label>
+                      <input
+                        type="text"
+                        required
+                        value={acc.accountName || ''}
+                        onChange={(e) => handleBankAccountChange(index, 'accountName', e.target.value)}
+                        placeholder="Contoh: Bendahara TK Melati"
+                        className="block w-full rounded-xl border border-zinc-300 py-2 px-3 focus:border-[#d4af37] outline-none text-zinc-700 font-medium bg-white"
+                      />
+                    </div>
+
+                    <div className="md:col-span-1 flex justify-center pb-0.5">
+                      <button
+                        type="button"
+                        onClick={() => handleRemoveBankAccountRow(index)}
+                        className="p-2 text-zinc-400 hover:text-red-500 hover:bg-red-50 rounded-xl transition-all"
+                        title="Hapus Rekening"
                       >
-                        <Edit className="h-4 w-4" />
-                      </button>
-                      <button 
-                        onClick={() => handleDeleteContent(item.id)}
-                        className="p-1.5 text-zinc-400 hover:text-red-500 transition-colors"
-                      >
-                        <Trash2 className="h-4 w-4" />
+                        <Trash2 className="h-4.5 w-4.5" />
                       </button>
                     </div>
                   </div>
                 ))}
+              </div>
+
+              <div className="flex justify-end pt-4 border-t border-zinc-150">
+                <button
+                  type="submit"
+                  className="rounded-xl bg-[#d4af37] hover:bg-[#f3cb65] text-black px-6 py-2.5 text-xs font-bold shadow-sm transition-all"
+                >
+                  Simpan Pengaturan Rekening
+                </button>
+              </div>
+            </div>
+          </form>
+        )}
+
+        {/* Tab 6: Halaman Kustom (Pages) */}
+        {activeTab === 'custom_pages' && (
+          <div className="bg-white border border-zinc-200 rounded-2xl p-6 shadow-sm space-y-6">
+            <div className="flex justify-between items-center border-b border-zinc-150 pb-3">
+              <div>
+                <h3 className="font-extrabold text-zinc-900 text-base">Halaman Kustom (Single Page)</h3>
+                <p className="text-xs text-zinc-500 mt-0.5">Buat halaman statis independen selain Berita (contoh: Profil Sejarah, Visi Misi, Alur Pendaftaran, Fasilitas).</p>
+              </div>
+              <button
+                onClick={handleOpenAddPage}
+                className="text-xs font-bold bg-[#d9a425] hover:bg-[#e5c158] text-black px-4 py-2 rounded-xl flex items-center gap-1.5 transition-all shadow-sm shadow-[#d9a425]/10"
+              >
+                <Plus className="h-4 w-4" /> Buat Halaman Baru
+              </button>
+            </div>
+
+            {pagesLoading ? (
+              <div className="flex flex-col items-center justify-center py-12 space-y-2">
+                <Loader2 className="h-6 w-6 animate-spin text-[#d9a425]" />
+                <span className="text-xs text-zinc-500 font-semibold">Memuat halaman kustom...</span>
+              </div>
+            ) : pagesList.length === 0 ? (
+              <div className="text-center py-16 border-2 border-dashed border-zinc-150 rounded-2xl space-y-2 text-zinc-400">
+                <Layers className="h-10 w-10 mx-auto opacity-50" />
+                <p className="text-xs">Belum ada halaman kustom yang dibuat. Mulai buat halaman pertama Anda!</p>
+              </div>
+            ) : (
+              <div className="overflow-x-auto rounded-xl border border-zinc-150">
+                <table className="w-full text-left border-collapse text-xs">
+                  <thead>
+                    <tr className="bg-zinc-50 border-b border-zinc-150 text-[10px] font-extrabold text-zinc-500 uppercase tracking-widest">
+                      <th className="px-5 py-3.5">Judul Halaman</th>
+                      <th className="px-5 py-3.5">Link / Slug</th>
+                      <th className="px-5 py-3.5">Status</th>
+                      <th className="px-5 py-3.5">Diperbarui</th>
+                      <th className="px-5 py-3.5 text-right">Aksi</th>
+                    </tr>
+                  </thead>
+                  <tbody className="divide-y divide-zinc-100">
+                    {pagesList.map((page) => (
+                      <tr key={page.id} className="hover:bg-zinc-50/50 transition-colors">
+                        <td className="px-5 py-3 font-semibold text-zinc-800 text-sm">{page.title}</td>
+                        <td className="px-5 py-3 font-mono text-zinc-500">/page/{page.slug}</td>
+                        <td className="px-5 py-3">
+                          <span className={`inline-block px-2.5 py-0.5 rounded-full font-bold uppercase text-[9px] ${
+                            page.status === 'published' ? 'bg-green-50 text-green-700 border border-green-150' : 'bg-zinc-50 text-zinc-500 border border-zinc-150'
+                          }`}>
+                            {page.status === 'published' ? 'Terbit' : 'Draft'}
+                          </span>
+                        </td>
+                        <td className="px-5 py-3 text-zinc-500">
+                          {new Date(page.updated_at || page.created_at).toLocaleDateString('id-ID', { day: 'numeric', month: 'short', year: 'numeric' })}
+                        </td>
+                        <td className="px-5 py-3 text-right">
+                          <div className="flex items-center justify-end gap-1">
+                            {page.status === 'published' && (
+                              <a
+                                href={`/school/${window.location.hostname.split('.')[0] === 'localhost' || window.location.hostname.split('.')[0] === '127' ? 'tkmelati' : window.location.hostname.split('.')[0]}/page/${page.slug}`}
+                                target="_blank"
+                                rel="noopener noreferrer"
+                                className="p-1.5 text-zinc-500 hover:text-emerald-600 hover:bg-zinc-50 rounded-lg transition-all inline-flex items-center"
+                                title="Lihat Halaman Publik"
+                              >
+                                <Eye className="h-4 w-4" />
+                              </a>
+                            )}
+                            <button
+                              onClick={() => handleOpenEditPage(page)}
+                              className="p-1.5 text-zinc-500 hover:text-[#d9a425] hover:bg-zinc-50 rounded-lg transition-all"
+                              title="Edit Halaman"
+                            >
+                              <Edit className="h-4 w-4" />
+                            </button>
+                            <button
+                              onClick={() => handleDeletePage(page.id)}
+                              className="p-1.5 text-zinc-400 hover:text-red-500 hover:bg-red-50 rounded-lg transition-all"
+                              title="Hapus Halaman"
+                            >
+                              <Trash2 className="h-4 w-4" />
+                            </button>
+                          </div>
+                        </td>
+                      </tr>
+                    ))}
+                  </tbody>
+                </table>
               </div>
             )}
           </div>
         )}
 
-        {/* Tab 4: Agenda Kegiatan */}
-        {activeTab === 'agenda' && (
-          <div className="rounded-2xl border border-zinc-800 bg-zinc-900/50 p-6 shadow-xl space-y-6">
-            <div className="flex items-center justify-between border-b border-zinc-800 pb-3">
-              <div className="flex items-center gap-3">
-                <Calendar className="h-5 w-5 text-[#d4af37]" />
-                <h2 className="text-xl font-semibold text-white">Agenda Kegiatan Sekolah</h2>
-              </div>
-              <button 
-                onClick={openAddModal}
-                className="rounded-lg bg-zinc-800 hover:bg-zinc-700 px-3 py-1.5 text-xs font-bold text-white flex items-center gap-1.5"
-              >
-                <Plus className="h-4 w-4" /> Tambah Agenda
-              </button>
+        {/* Tab 7: Menu Navigasi Dinamis */}
+        {activeTab === 'custom_menus' && (
+          <div className="bg-white border border-zinc-200 rounded-2xl p-6 shadow-sm space-y-6">
+            <div className="border-b border-zinc-150 pb-3">
+              <h3 className="font-extrabold text-zinc-900 text-base">Susunan Menu Navigasi</h3>
+              <p className="text-xs text-zinc-500 mt-0.5">Kelola menu yang tampil di bagian atas website sekolah Anda. Anda bisa menautkan ke halaman kustom, link luar, atau menu bawaan.</p>
             </div>
 
-            {contentLoading ? (
-              <div className="flex justify-center py-10">
-                <Loader2 className="h-8 w-8 animate-spin text-[#d4af37]" />
-              </div>
-            ) : contents.length === 0 ? (
-              <p className="text-zinc-500 text-sm text-center py-10">Belum ada agenda kegiatan.</p>
-            ) : (
-              <div className="space-y-4">
-                {contents.map((item) => (
-                  <div key={item.id} className="rounded-xl border border-zinc-800 bg-zinc-950 p-4 flex justify-between items-center gap-4">
-                    <div className="space-y-1">
-                      <h4 className="font-bold text-sm text-white">{item.title}</h4>
-                      <p className="text-xs text-[#d4af37] font-mono">
-                        📅 {item.event_date ? new Date(item.event_date).toLocaleDateString('id-ID', { day: 'numeric', month: 'long', year: 'numeric' }) : '-'}
-                      </p>
-                      <p className="text-xs text-zinc-400 font-light">{item.content}</p>
-                    </div>
+            <div className="grid md:grid-cols-12 gap-8">
 
-                    <div className="flex gap-2 shrink-0">
-                      <button 
-                        onClick={() => openEditModal(item)}
-                        className="p-1.5 text-zinc-400 hover:text-[#d4af37]"
+              {/* Tambah Item Menu Form */}
+              <div className="md:col-span-5 bg-zinc-50 rounded-2xl p-5 border border-zinc-150 space-y-4 text-xs">
+                <h4 className="font-extrabold text-zinc-800 text-sm">Tambah Menu Baru</h4>
+
+                <div className="space-y-1.5">
+                  <label className="block font-bold text-zinc-700">Label Menu</label>
+                  <input
+                    type="text"
+                    value={newMenuLabel}
+                    onChange={(e) => setNewMenuLabel(e.target.value)}
+                    placeholder="Contoh: Sejarah, Kontak"
+                    className="block w-full rounded-xl border border-zinc-300 py-2 px-3 focus:border-[#d9a425] outline-none text-zinc-800 bg-white"
+                  />
+                </div>
+
+                <div className="space-y-1.5">
+                  <label className="block font-bold text-zinc-700">Tipe Menu</label>
+                  <select
+                    value={newMenuType}
+                    onChange={(e) => {
+                      setNewMenuType(e.target.value);
+                      if (e.target.value === 'built_in') setNewMenuValue('#home');
+                      else if (e.target.value === 'page' && pagesList.length > 0) setNewMenuValue(pagesList[0].slug);
+                      else setNewMenuValue('');
+                    }}
+                    className="block w-full rounded-xl border border-zinc-300 py-2 px-3 focus:border-[#d9a425] outline-none text-zinc-800 bg-white"
+                  >
+                    <option value="built_in">Menu Bawaan (Anchor/Sistem)</option>
+                    <option value="page">Halaman Kustom</option>
+                    <option value="link">Link Luar (External URL)</option>
+                  </select>
+                </div>
+
+                <div className="space-y-1.5">
+                  <label className="block font-bold text-zinc-700">Tujuan Penautan</label>
+
+                  {newMenuType === 'built_in' && (
+                    <select
+                      value={newMenuValue}
+                      onChange={(e) => setNewMenuValue(e.target.value)}
+                      className="block w-full rounded-xl border border-zinc-300 py-2 px-3 focus:border-[#d9a425] outline-none text-zinc-800 bg-white"
+                    >
+                      <option value="#home">Beranda</option>
+                      <option value="#profil">Sambutan Kepala Sekolah</option>
+                      <option value="#visi-misi">Visi &amp; Misi</option>
+                      <option value="#galeri">Galeri Foto</option>
+                      <option value="#berita">Berita Terbaru</option>
+                      <option value="#kontak">Kontak &amp; Lokasi</option>
+                      <option value="ppdb">Pendaftaran PPDB Online</option>
+                      <option value="ppdb/status">Cek Status PPDB</option>
+                    </select>
+                  )}
+
+                  {newMenuType === 'page' && (
+                    <select
+                      value={newMenuValue}
+                      onChange={(e) => setNewMenuValue(e.target.value)}
+                      className="block w-full rounded-xl border border-zinc-300 py-2 px-3 focus:border-[#d9a425] outline-none text-zinc-800 bg-white"
+                    >
+                      {pagesList.length === 0 ? (
+                        <option value="" disabled>Belum ada halaman kustom. Buat dulu di tab Halaman Kustom!</option>
+                      ) : (
+                        pagesList.map(page => (
+                          <option key={page.id} value={page.slug}>{page.title}</option>
+                        ))
+                      )}
+                    </select>
+                  )}
+
+                  {newMenuType === 'link' && (
+                    <input
+                      type="text"
+                      value={newMenuValue}
+                      onChange={(e) => setNewMenuValue(e.target.value)}
+                      placeholder="https://facebook.com/sekolah"
+                      className="block w-full rounded-xl border border-zinc-300 py-2 px-3 focus:border-[#d9a425] outline-none text-zinc-800 bg-white"
+                    />
+                  )}
+                </div>
+
+                <button
+                  type="button"
+                  onClick={handleAddMenuItem}
+                  disabled={!newMenuLabel.trim() || (newMenuType === 'page' && pagesList.length === 0)}
+                  className="w-full mt-2 rounded-xl bg-[#d9a425] hover:bg-[#e5c158] disabled:opacity-50 text-black py-2.5 font-bold flex items-center justify-center gap-1.5 transition-all"
+                >
+                  <Plus className="h-4 w-4" /> Tambah ke Navigasi
+                </button>
+              </div>
+
+              {/* List Menu Susunan */}
+              <div className="md:col-span-7 space-y-4">
+                <h4 className="font-extrabold text-zinc-800 text-sm">Susunan Navigasi Aktif</h4>
+
+                {menuItems.length === 0 ? (
+                  <div className="text-center py-16 border-2 border-dashed border-zinc-150 rounded-2xl space-y-2 text-zinc-400">
+                    <Globe className="h-10 w-10 mx-auto opacity-50" />
+                    <p className="text-xs">Navigasi kosong. Gunakan panel sebelah kiri untuk menambahkan menu.</p>
+                  </div>
+                ) : (
+                  <div className="space-y-2.5">
+                    {menuItems.map((item, idx) => (
+                      <div
+                        key={idx}
+                        className="flex items-center justify-between p-3.5 bg-white border border-zinc-200 rounded-xl shadow-sm hover:shadow-md transition-shadow"
                       >
-                        <Edit className="h-4 w-4" />
-                      </button>
-                      <button 
-                        onClick={() => handleDeleteContent(item.id)}
-                        className="p-1.5 text-zinc-400 hover:text-red-400"
+                        <div className="min-w-0 text-xs">
+                          <p className="font-extrabold text-zinc-800 text-sm">{item.label}</p>
+                          <p className="text-[10px] text-zinc-500 mt-0.5">
+                            Tipe: <span className="font-bold text-zinc-700 capitalize">{item.type}</span> |
+                            Tujuan: <span className="font-mono text-zinc-650 bg-zinc-50 px-1 rounded">{item.value}</span>
+                          </p>
+                        </div>
+
+                        <div className="flex items-center gap-1.5 shrink-0">
+                          {/* Reordering */}
+                          <button
+                            type="button"
+                            onClick={() => handleMoveMenuItem(idx, -1)}
+                            disabled={idx === 0}
+                            className="p-1.5 text-zinc-400 hover:text-zinc-700 disabled:opacity-30 hover:bg-zinc-50 rounded-lg"
+                            title="Pindah Ke Atas"
+                          >
+                            ▲
+                          </button>
+                          <button
+                            type="button"
+                            onClick={() => handleMoveMenuItem(idx, 1)}
+                            disabled={idx === menuItems.length - 1}
+                            className="p-1.5 text-zinc-400 hover:text-zinc-700 disabled:opacity-30 hover:bg-zinc-50 rounded-lg"
+                            title="Pindah Ke Bawah"
+                          >
+                            ▼
+                          </button>
+
+                          {/* Remove */}
+                          <button
+                            type="button"
+                            onClick={() => handleRemoveMenuItem(idx)}
+                            className="p-1.5 text-zinc-400 hover:text-red-500 hover:bg-red-50 rounded-lg"
+                            title="Hapus Menu"
+                          >
+                            <Trash2 className="h-4 w-4" />
+                          </button>
+                        </div>
+                      </div>
+                    ))}
+
+                    <div className="flex justify-end pt-4 border-t border-zinc-150">
+                      <button
+                        type="button"
+                        onClick={handleSaveMenus}
+                        disabled={menuSaving}
+                        className="rounded-xl bg-[#d9a425] hover:bg-[#e5c158] text-black px-6 py-2.5 text-xs font-bold flex items-center gap-1.5 transition-all shadow-md shadow-[#d9a425]/10"
                       >
-                        <Trash2 className="h-4 w-4" />
+                        {menuSaving && <Loader2 className="h-4 w-4 animate-spin" />}
+                        Simpan Susunan Menu
                       </button>
                     </div>
                   </div>
-                ))}
+                )}
               </div>
-            )}
+
+            </div>
           </div>
         )}
 
       </div>
 
-      {/* Content Form Modal (For Gallery & Agenda add/edit) */}
-      {showModal && (
-        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/80 backdrop-blur-sm p-4">
-          <div className="w-full max-w-md rounded-2xl border border-zinc-850 bg-zinc-950 p-6 shadow-2xl space-y-6">
-            <div className="flex items-center justify-between border-b border-zinc-900 pb-3">
-              <h3 className="text-lg font-bold text-white">
-                {editingContent ? 'Edit Konten' : 'Tambah Konten Baru'}
+      {/* PAGE DIALOG MODAL */}
+      {showPageModal && (
+        <div className="fixed inset-0 z-50 overflow-y-auto flex items-center justify-center p-4 bg-zinc-900/60 backdrop-blur-sm">
+          <div className="relative w-full max-w-2xl bg-white rounded-2xl shadow-2xl border border-zinc-150 overflow-hidden text-xs">
+            <div className="px-6 py-4.5 border-b border-zinc-150 flex justify-between items-center bg-zinc-50/50">
+              <h3 className="font-extrabold text-zinc-900 text-sm">
+                {editingPage ? 'Edit Halaman Kustom' : 'Buat Halaman Kustom Baru'}
               </h3>
-              <button onClick={() => setShowModal(false)} className="text-zinc-400 hover:text-white">
-                <X className="h-5 w-5" />
-              </button>
+              <button onClick={() => setShowPageModal(false)} className="text-zinc-400 hover:text-zinc-650 font-bold">✕</button>
             </div>
 
-            <form onSubmit={handleContentSubmit} className="space-y-4">
-              <div>
-                <label className="block text-xs font-bold uppercase tracking-wider text-zinc-400">Judul Konten</label>
-                <input 
-                  type="text" 
+            <form onSubmit={handlePageSubmit} className="p-6 space-y-4">
+              <div className="space-y-1.5">
+                <label className="block font-bold text-zinc-700">Judul Halaman</label>
+                <input
+                  type="text"
                   required
-                  value={contentTitle}
-                  onChange={(e) => setContentTitle(e.target.value)}
-                  placeholder="Masukkan judul menarik"
-                  className="block w-full mt-1.5 rounded-xl border border-zinc-850 bg-zinc-900 py-2.5 px-3.5 text-sm text-white focus:border-[#d4af37] outline-none"
+                  value={pageTitle}
+                  onChange={(e) => setPageTitle(e.target.value)}
+                  placeholder="Contoh: Sejarah Berdirinya Yayasan"
+                  className="block w-full rounded-xl border border-zinc-300 py-2.5 px-3 focus:border-[#d9a425] outline-none text-zinc-800 bg-white"
                 />
               </div>
 
-              <div>
-                <label className="block text-xs font-bold uppercase tracking-wider text-zinc-400">Keterangan / Isi Deskripsi</label>
-                <textarea 
-                  rows="4"
-                  value={contentText}
-                  onChange={(e) => setContentText(e.target.value)}
-                  placeholder="Tulis isi deskripsi selengkapnya..."
-                  className="block w-full mt-1.5 rounded-xl border border-zinc-850 bg-zinc-900 py-2.5 px-3.5 text-sm text-white focus:border-[#d4af37] outline-none"
+              <div className="space-y-1.5">
+                <label className="block font-bold text-zinc-700">Konten Halaman (Format teks kosong didukung)</label>
+                <textarea
+                  rows="12"
+                  required
+                  value={pageContent}
+                  onChange={(e) => setPageContent(e.target.value)}
+                  placeholder="Tulis sejarah sekolah, profil, program, visi misi, atau informasi penting lainnya..."
+                  className="block w-full rounded-xl border border-zinc-300 py-2.5 px-3 focus:border-[#d9a425] outline-none text-zinc-850 bg-white leading-relaxed font-light text-sm"
                 />
               </div>
 
-              {activeTab === 'agenda' && (
-                <div>
-                  <label className="block text-xs font-bold uppercase tracking-wider text-zinc-400">Tanggal Pelaksanaan Kegiatan</label>
-                  <input 
-                    type="date" 
-                    required
-                    value={contentDate}
-                    onChange={(e) => setContentDate(e.target.value)}
-                    className="block w-full mt-1.5 rounded-xl border border-zinc-850 bg-zinc-900 py-2.5 px-3.5 text-sm text-white focus:border-[#d4af37] outline-none"
-                  />
-                </div>
-              )}
+              <div className="space-y-1.5">
+                <label className="block font-bold text-zinc-700">Status Halaman</label>
+                <select
+                  value={pageStatus}
+                  onChange={(e) => setPageStatus(e.target.value)}
+                  className="block w-full rounded-xl border border-zinc-300 py-2.5 px-3 focus:border-[#d9a425] outline-none text-zinc-800 bg-white"
+                >
+                  <option value="published">Terbitkan Langsung (Published)</option>
+                  <option value="draft">Simpan Sebagai Draft</option>
+                </select>
+              </div>
 
-              {activeTab === 'galeri' && (
-                <div>
-                  <label className="block text-xs font-bold uppercase tracking-wider text-zinc-400">Upload Berkas Foto</label>
-                  <input 
-                    type="file" 
-                    accept="image/*"
-                    required={!editingContent}
-                    onChange={(e) => setContentFile(e.target.files?.[0] || null)}
-                    className="block w-full mt-2 text-xs text-zinc-400"
-                  />
-                </div>
-              )}
-
-              <div className="flex justify-end gap-3 pt-4 border-t border-zinc-900">
-                <button 
+              <div className="pt-4 border-t border-zinc-150 flex justify-end gap-3">
+                <button
                   type="button"
-                  onClick={() => setShowModal(false)}
-                  className="rounded-xl border border-zinc-850 px-4 py-2.5 text-xs font-bold text-zinc-400 hover:text-white"
+                  onClick={() => setShowPageModal(false)}
+                  className="px-4 py-2.5 rounded-xl border border-zinc-350 hover:bg-zinc-50 font-bold text-zinc-700"
                 >
                   Batal
                 </button>
-                <button 
+                <button
                   type="submit"
-                  className="rounded-xl bg-[#d4af37] hover:bg-[#f3cb65] px-6 py-2.5 text-xs font-bold text-black transition-colors"
+                  disabled={pageSubmitLoading}
+                  className="px-5 py-2.5 rounded-xl bg-[#d9a425] hover:bg-[#e5c158] font-bold text-black flex items-center gap-1.5 transition-all shadow-sm"
                 >
-                  Simpan Konten
+                  {pageSubmitLoading && <Loader2 className="h-4 w-4 animate-spin" />}
+                  Simpan Halaman
+                </button>
+              </div>
+            </form>
+          </div>
+        </div>
+      )}
+
+
+
+      {/* YEAR MODAL DIALOG */}
+      {showYearModal && (
+        <div className="fixed inset-0 z-50 overflow-y-auto flex items-center justify-center p-4 bg-zinc-900/60 backdrop-blur-sm">
+          <div className="relative w-full max-w-sm bg-white rounded-2xl shadow-xl border border-zinc-150 overflow-hidden text-xs">
+            <div className="px-6 py-4.5 border-b border-zinc-150 flex justify-between items-center bg-zinc-50/50">
+              <h3 className="font-extrabold text-zinc-900 text-sm">
+                {editingYear ? 'Edit Tahun Ajaran' : 'Tambah Tahun Ajaran'}
+              </h3>
+              <button onClick={() => setShowYearModal(false)} className="text-zinc-400 hover:text-zinc-600 font-bold">✕</button>
+            </div>
+            <form onSubmit={handleYearSubmit} className="p-6 space-y-4">
+              <div className="space-y-1.5">
+                <label className="block font-bold text-zinc-700">Tahun Ajaran</label>
+                <input
+                  type="text"
+                  required
+                  value={yearName}
+                  onChange={(e) => setYearName(e.target.value)}
+                  placeholder="Contoh: 2025/2026"
+                  className="block w-full rounded-xl border border-zinc-350 py-2.5 px-3 focus:border-[#d4af37] outline-none text-zinc-800"
+                />
+              </div>
+
+              <div className="flex items-center gap-2 pt-2">
+                <input
+                  type="checkbox"
+                  id="year-active"
+                  checked={yearIsActive}
+                  onChange={(e) => setYearIsActive(e.target.checked)}
+                  className="h-4 w-4 rounded border-zinc-300 text-[#d4af37] focus:ring-[#d4af37]"
+                />
+                <label htmlFor="year-active" className="font-bold text-zinc-700 cursor-pointer">Jadikan Tahun Ajaran Aktif</label>
+              </div>
+
+              <div className="pt-4 border-t border-zinc-150 flex justify-end gap-3">
+                <button
+                  type="button"
+                  onClick={() => setShowYearModal(false)}
+                  className="px-4 py-2.5 rounded-xl border border-zinc-300 hover:bg-zinc-50 font-bold text-zinc-700"
+                >
+                  Batal
+                </button>
+                <button
+                  type="submit"
+                  disabled={academicSubmitLoading}
+                  className="px-5 py-2.5 rounded-xl bg-[#d4af37] hover:bg-[#f3cb65] font-bold text-black flex items-center gap-1"
+                >
+                  {academicSubmitLoading && <Loader2 className="h-3.5 w-3.5 animate-spin" />}
+                  Simpan
+                </button>
+              </div>
+            </form>
+          </div>
+        </div>
+      )}
+
+      {/* SEMESTER MODAL DIALOG */}
+      {showSemesterModal && (
+        <div className="fixed inset-0 z-50 overflow-y-auto flex items-center justify-center p-4 bg-zinc-900/60 backdrop-blur-sm">
+          <div className="relative w-full max-w-sm bg-white rounded-2xl shadow-xl border border-zinc-150 overflow-hidden text-xs">
+            <div className="px-6 py-4.5 border-b border-zinc-150 flex justify-between items-center bg-zinc-50/50">
+              <h3 className="font-extrabold text-zinc-900 text-sm">
+                {editingSemester ? 'Edit Semester' : 'Tambah Semester'}
+              </h3>
+              <button onClick={() => setShowSemesterModal(false)} className="text-zinc-400 hover:text-zinc-650 font-bold">✕</button>
+            </div>
+            <form onSubmit={handleSemesterSubmit} className="p-6 space-y-4">
+
+              <div className="space-y-1.5">
+                <label className="block font-bold text-zinc-700">Tahun Ajaran Terikat</label>
+                <select
+                  value={semesterYearId}
+                  onChange={(e) => setSemesterYearId(e.target.value)}
+                  className="block w-full rounded-xl border border-zinc-300 py-2.5 px-3 focus:border-[#d4af37] outline-none text-zinc-800"
+                >
+                  {academicYears.map(year => (
+                    <option key={year.id} value={year.id}>{year.name}</option>
+                  ))}
+                </select>
+              </div>
+
+              <div className="space-y-1.5">
+                <label className="block font-bold text-zinc-700">Nama Semester</label>
+                <select
+                  value={semesterName}
+                  onChange={(e) => setSemesterName(e.target.value)}
+                  className="block w-full rounded-xl border border-zinc-300 py-2.5 px-3 focus:border-[#d4af37] outline-none text-zinc-800"
+                >
+                  <option value="Ganjil">Semester Ganjil</option>
+                  <option value="Genap">Semester Genap</option>
+                </select>
+              </div>
+
+              <div className="space-y-1.5">
+                <label className="block font-bold text-zinc-700">Status</label>
+                <select
+                  value={semesterStatus}
+                  onChange={(e) => setSemesterStatus(e.target.value)}
+                  className="block w-full rounded-xl border border-zinc-300 py-2.5 px-3 focus:border-[#d4af37] outline-none text-zinc-800"
+                >
+                  <option value="active">Aktif</option>
+                  <option value="inactive">Nonaktif</option>
+                </select>
+              </div>
+
+              <div className="pt-4 border-t border-zinc-150 flex justify-end gap-3">
+                <button
+                  type="button"
+                  onClick={() => setShowSemesterModal(false)}
+                  className="px-4 py-2.5 rounded-xl border border-zinc-300 hover:bg-zinc-50 font-bold text-zinc-700"
+                >
+                  Batal
+                </button>
+                <button
+                  type="submit"
+                  disabled={academicSubmitLoading}
+                  className="px-5 py-2.5 rounded-xl bg-[#d4af37] hover:bg-[#f3cb65] font-bold text-black flex items-center gap-1"
+                >
+                  {academicSubmitLoading && <Loader2 className="h-3.5 w-3.5 animate-spin" />}
+                  Simpan
                 </button>
               </div>
             </form>

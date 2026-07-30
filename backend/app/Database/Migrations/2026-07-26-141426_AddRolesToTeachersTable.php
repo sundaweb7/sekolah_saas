@@ -8,6 +8,9 @@ class AddRolesToTeachersTable extends Migration
 {
     public function up()
     {
+        if ($this->db->fieldExists('roles', 'teachers')) {
+            return;
+        }
         $fields = [
             'roles' => [
                 'type'       => 'TEXT',
@@ -21,6 +24,6 @@ class AddRolesToTeachersTable extends Migration
 
     public function down()
     {
-        $this->forge->dropColumn('teachers', 'roles');
+        // Non-destructive reconciliation migration.
     }
 }

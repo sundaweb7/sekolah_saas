@@ -35,6 +35,9 @@ class CreateSchoolsTable extends Migration
                 'constraint' => ['active', 'inactive', 'suspended'],
                 'default'    => 'active',
             ],
+            'subscription_plan' => ['type' => 'VARCHAR', 'constraint' => 30, 'default' => 'trial'],
+            'billing_cycle' => ['type' => 'VARCHAR', 'constraint' => 20, 'null' => true],
+            'expires_at' => ['type' => 'DATE', 'null' => true],
             'created_at' => [
                 'type' => 'DATETIME',
                 'null' => true,

@@ -70,11 +70,14 @@ class TeacherController extends BaseResourceController
     public function create(): ResponseInterface
     {
         $email = $this->request->getPost('email');
-        $password = $this->request->getPost('password') ?? 'guru123'; // Default temp password
+        $password = $this->request->getPost('password');
         $fullName = $this->request->getPost('full_name');
         
-        if (empty($email) || empty($fullName)) {
-            return $this->respondError('Full Name and Email are required', ResponseInterface::HTTP_BAD_REQUEST);
+        if (empty($email) || empty($fullName) || empty($password)) {
+            return $this->respondError('Full Name, Email, and Password are required', ResponseInterface::HTTP_BAD_REQUEST);
+        }
+        if (!filter_var($email, FILTER_VALIDATE_EMAIL) || strlen($password) < 8) {
+            return $this->respondError('Email tidak valid atau password kurang dari 8 karakter', ResponseInterface::HTTP_BAD_REQUEST);
         }
 
         $userModel = new UserModel();
@@ -232,38 +235,8 @@ class TeacherController extends BaseResourceController
             return $this->respondError('Associated teacher user account is not active or not found', ResponseInterface::HTTP_NOT_FOUND);
         }
 
-        $jwtService = new \App\Libraries\JWTService();
-        
-        $payload = [
-            'id'        => $user->id,
-            'school_id' => $user->school_id,
-            'email'     => $user->email,
-            'role'      => $user->role,
-            'full_name' => $user->full_name
-        ];
-        
-        $accessToken = $jwtService->generateToken($payload);
-        $refreshTokenString = bin2hex(random_bytes(32));
-
-        $refreshTokenModel = new \App\Models\RefreshTokenModel();
-        $refreshTokenModel->where('user_id', $user->id)->delete();
-        $refreshTokenModel->save([
-            'school_id'  => $user->school_id,
-            'user_id'    => $user->id,
-            'token'      => $refreshTokenString,
-            'expires_at' => date('Y-m-d H:i:s', time() + 2592000)
-        ]);
-
         return $this->respondSuccess([
-            'access_token'  => $accessToken,
-            'refresh_token' => $refreshTokenString,
-            'user' => [
-                'id'        => $user->id,
-                'email'     => $user->email,
-                'role'      => $user->role,
-                'full_name' => $user->full_name,
-                'school_id' => $user->school_id
-            ]
-        ], 'Teacher impersonation session generated successfully');
+            'code' => (new \App\Services\ImpersonationService())->createCode((int) $user->school_id, (int) $user->id),
+        ], 'Single-use teacher impersonation code generated');
     }
 }

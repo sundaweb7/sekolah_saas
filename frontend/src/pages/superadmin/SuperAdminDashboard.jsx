@@ -1,8 +1,8 @@
 import { useState, useEffect } from 'react';
 import api from '../../config/axios';
 import SuperAdminLayout from '../../layouts/SuperAdminLayout';
-import { 
-  School, CreditCard, Shield, Users, Loader2, AlertCircle, 
+import {
+  School, CreditCard, Shield, Users, Loader2, AlertCircle,
   CheckCircle, XCircle, Search, Calendar, DollarSign, Eye, X, LogIn, Power, Plus, Trash2, FileText
 } from 'lucide-react';
 
@@ -64,6 +64,64 @@ export default function SuperAdminDashboard() {
   const [selectedSchoolDetail, setSelectedSchoolDetail] = useState(null);
   const [loadingDetail, setLoadingDetail] = useState(false);
   const [showDetailModal, setShowDetailModal] = useState(false);
+
+  // Edit School Modal States
+  const [showEditModal, setShowEditModal] = useState(false);
+  const [editingSchoolId, setEditingSchoolId] = useState(null);
+  const [editSchoolName, setEditSchoolName] = useState('');
+  const [editNpsn, setEditNpsn] = useState('');
+  const [editLevel, setEditLevel] = useState('TK');
+  const [editSubdomain, setEditSubdomain] = useState('');
+  const [editAdminName, setEditAdminName] = useState('');
+  const [editPhone, setEditPhone] = useState('');
+  const [savingSchool, setSavingSchool] = useState(false);
+
+  const downloadDomainDocument = async (request) => {
+    try {
+      const blob = await api.get(`/superadmin/domain-requests/document/${request.id}`, { responseType: 'blob' });
+      const url = URL.createObjectURL(blob);
+      const link = document.createElement('a');
+      link.href = url;
+      link.download = `domain-request-${request.id}`;
+      link.click();
+      URL.revokeObjectURL(url);
+    } catch (err) {
+      alert(err.message || 'Gagal mengunduh dokumen.');
+    }
+  };
+
+  const handleOpenEdit = (school) => {
+    setEditingSchoolId(school.id);
+    setEditSchoolName(school.name);
+    setEditNpsn(school.npsn || '');
+    setEditLevel(school.level || 'TK');
+    setEditSubdomain(school.subdomain);
+    setEditAdminName(school.admin_name || '');
+    setEditPhone(school.phone || '');
+    setShowEditModal(true);
+  };
+
+  const handleSaveSchoolEdit = async (e) => {
+    e.preventDefault();
+    setSavingSchool(true);
+    try {
+      await api.post(`/superadmin/schools/update/${editingSchoolId}`, {
+        name: editSchoolName,
+        npsn: editNpsn,
+        level: editLevel,
+        subdomain: editSubdomain,
+        admin_name: editAdminName,
+        phone: editPhone
+      });
+      alert('Data sekolah berhasil diperbarui!');
+      setShowEditModal(false);
+      fetchData();
+    } catch (err) {
+      alert(err.response?.data?.message || err.message || 'Gagal memperbarui data sekolah.');
+    } finally {
+      setSavingSchool(false);
+    }
+  };
 
   const handleViewDetail = async (schoolId) => {
     setLoadingDetail(true);
@@ -133,10 +191,10 @@ export default function SuperAdminDashboard() {
     setUpdatingSchoolId(schoolId);
     try {
       await api.post(`/superadmin/schools/status/${schoolId}`, { status: newStatus });
-      
+
       // Update local state
       setSchools(prev => prev.map(s => s.id === schoolId ? { ...s, status: newStatus } : s));
-      
+
       // Update stats
       setStats(prev => ({
         ...prev,
@@ -197,24 +255,26 @@ export default function SuperAdminDashboard() {
     setImpersonatingId(schoolId);
     try {
       const res = await api.post(`/superadmin/impersonate/${schoolId}`);
-      const { access_token, refresh_token, user, subdomain } = res.data;
-      
+      const { code, subdomain } = res.data;
+
       const protocol = window.location.protocol;
       const hostname = window.location.hostname;
       const port = window.location.port ? `:${window.location.port}` : '';
-      
+
       const domainParts = hostname.split('.');
       let baseDomain = hostname;
       if (domainParts.length >= 2) {
         if (domainParts[domainParts.length - 2] === 'localhost' || domainParts[domainParts.length - 1] === 'localhost') {
           baseDomain = 'localhost';
+        } else if (hostname.endsWith('.my.id')) {
+          baseDomain = domainParts.slice(-3).join('.');
         } else {
           baseDomain = domainParts.slice(-2).join('.');
         }
       }
-      
-      const redirectUrl = `${protocol}//${subdomain}.${baseDomain}${port}/login?sso_token=${access_token}&sso_refresh_token=${refresh_token}&sso_school_id=${user.school_id}&sso_role=${user.role}`;
-      
+
+      const redirectUrl = `${protocol}//${subdomain}.${baseDomain}${port}/login?impersonation_code=${encodeURIComponent(code)}`;
+
       window.open(redirectUrl, '_blank');
     } catch (err) {
       alert(err.message || 'Gagal masuk sebagai tenant.');
@@ -296,8 +356,8 @@ export default function SuperAdminDashboard() {
         <AlertCircle className="h-14 w-14 text-red-500 mb-4" />
         <p className="text-zinc-900 font-extrabold text-xl">Terjadi Gangguan Koneksi</p>
         <p className="text-sm mt-2 max-w-md">{error}</p>
-        <button 
-          onClick={fetchData} 
+        <button
+          onClick={fetchData}
           className="mt-6 rounded-xl bg-indigo-600 text-white px-5 py-2.5 text-xs font-bold hover:bg-indigo-500 transition-all shadow-md"
         >
           Coba Lagi
@@ -307,13 +367,13 @@ export default function SuperAdminDashboard() {
   }
 
   // Filter schools based on search
-  const filteredSchools = schools.filter(s => 
-    s.name.toLowerCase().includes(schoolSearch.toLowerCase()) || 
+  const filteredSchools = schools.filter(s =>
+    s.name.toLowerCase().includes(schoolSearch.toLowerCase()) ||
     s.subdomain.toLowerCase().includes(schoolSearch.toLowerCase())
   );
 
   // Filter invoices based on search
-  const filteredInvoices = invoices.filter(inv => 
+  const filteredInvoices = invoices.filter(inv =>
     inv.invoice_number.toLowerCase().includes(invoiceSearch.toLowerCase()) ||
     (inv.school_name && inv.school_name.toLowerCase().includes(invoiceSearch.toLowerCase()))
   );
@@ -321,7 +381,7 @@ export default function SuperAdminDashboard() {
   return (
     <SuperAdminLayout activeTab={activeTab} setActiveTab={setActiveTab}>
       <div className="p-6 md:p-8 max-w-7xl mx-auto w-full space-y-8">
-        
+
         {/* Header Title Section */}
         <div className="flex flex-col md:flex-row md:items-center md:justify-between gap-4">
           <div>
@@ -329,7 +389,7 @@ export default function SuperAdminDashboard() {
             <p className="mt-1 text-sm text-zinc-500">Kelola database sekolah terdaftar, pendaftaran SaaS, dan pemantauan billing secara real-time.</p>
           </div>
           <div className="flex items-center gap-3 self-start md:self-auto">
-            <button 
+            <button
               disabled={clearingCache}
               onClick={handleClearCache}
               className="rounded-xl border border-red-200 bg-red-50 hover:bg-red-100 text-xs font-bold text-red-655 px-4 py-2.5 shadow-sm transition-all flex items-center gap-1.5"
@@ -340,8 +400,8 @@ export default function SuperAdminDashboard() {
                 'Bersihkan Cache'
               )}
             </button>
-            <button 
-              onClick={fetchData} 
+            <button
+              onClick={fetchData}
               className="rounded-xl border border-zinc-200 bg-white hover:bg-zinc-50 text-xs font-bold text-zinc-700 px-4 py-2.5 shadow-sm transition-all"
             >
               Refresh Data
@@ -354,46 +414,46 @@ export default function SuperAdminDashboard() {
           <div className="space-y-8">
             {/* Stats Cards */}
             <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-6">
-              
-              <div className="rounded-2xl border border-zinc-200 bg-white p-6 shadow-sm">
-                <div className="h-10 w-10 rounded-lg bg-indigo-50 flex items-center justify-center text-indigo-600 mb-4">
+
+              <div className="rounded-2xl bg-white p-6 shadow-sm border-t-4 border-t-sky-550 border-x border-b border-zinc-200/80 transform hover:-translate-y-1 transition-all duration-300">
+                <div className="h-10 w-10 rounded-xl bg-sky-50 flex items-center justify-center text-sky-600 mb-4">
                   <School className="h-5 w-5" />
                 </div>
-                <p className="text-3xl font-black text-zinc-900">{stats?.total_schools}</p>
-                <p className="text-xs font-bold text-zinc-500 uppercase tracking-wider mt-1.5">Total Sekolah (Tenant)</p>
+                <p className="text-3.5xl font-black text-zinc-900 leading-none">{stats?.total_schools}</p>
+                <p className="text-[10px] font-extrabold text-zinc-450 uppercase tracking-widest mt-2.5">Total Sekolah (Tenant)</p>
               </div>
 
-              <div className="rounded-2xl border border-zinc-200 bg-white p-6 shadow-sm">
-                <div className="h-10 w-10 rounded-lg bg-green-50 flex items-center justify-center text-green-600 mb-4">
+              <div className="rounded-2xl bg-white p-6 shadow-sm border-t-4 border-t-sky-550 border-x border-b border-zinc-200/80 transform hover:-translate-y-1 transition-all duration-300">
+                <div className="h-10 w-10 rounded-xl bg-sky-50 flex items-center justify-center text-sky-600 mb-4">
                   <CheckCircle className="h-5 w-5" />
                 </div>
-                <p className="text-3xl font-black text-zinc-900">{stats?.active_schools}</p>
-                <p className="text-xs font-bold text-zinc-500 uppercase tracking-wider mt-1.5">Sekolah Aktif</p>
+                <p className="text-3.5xl font-black text-zinc-900 leading-none">{stats?.active_schools}</p>
+                <p className="text-[10px] font-extrabold text-zinc-450 uppercase tracking-widest mt-2.5">Sekolah Aktif</p>
               </div>
 
-              <div className="rounded-2xl border border-zinc-200 bg-white p-6 shadow-sm">
-                <div className="h-10 w-10 rounded-lg bg-orange-50 flex items-center justify-center text-orange-600 mb-4">
+              <div className="rounded-2xl bg-white p-6 shadow-sm border-t-4 border-t-sky-550 border-x border-b border-zinc-200/80 transform hover:-translate-y-1 transition-all duration-300">
+                <div className="h-10 w-10 rounded-xl bg-sky-50 flex items-center justify-center text-sky-600 mb-4">
                   <Users className="h-5 w-5" />
                 </div>
-                <p className="text-3xl font-black text-zinc-900">{stats?.total_users}</p>
-                <p className="text-xs font-bold text-zinc-500 uppercase tracking-wider mt-1.5">Total Pengguna Terdaftar</p>
+                <p className="text-3.5xl font-black text-zinc-900 leading-none">{stats?.total_users}</p>
+                <p className="text-[10px] font-extrabold text-zinc-450 uppercase tracking-widest mt-2.5">Total Pengguna Terdaftar</p>
               </div>
 
-              <div className="rounded-2xl border border-zinc-200 bg-white p-6 shadow-sm">
-                <div className="h-10 w-10 rounded-lg bg-emerald-50 flex items-center justify-center text-emerald-600 mb-4">
+              <div className="rounded-2xl bg-white p-6 shadow-sm border-t-4 border-t-sky-550 border-x border-b border-zinc-200/80 transform hover:-translate-y-1 transition-all duration-300">
+                <div className="h-10 w-10 rounded-xl bg-sky-50 flex items-center justify-center text-sky-600 mb-4">
                   <CreditCard className="h-5 w-5" />
                 </div>
-                <p className="text-3xl font-black text-zinc-900">
+                <p className="text-3.5xl font-black text-zinc-900 leading-none">
                   Rp {(stats?.total_revenue || 0).toLocaleString('id-ID')}
                 </p>
-                <p className="text-xs font-bold text-zinc-500 uppercase tracking-wider mt-1.5">Total Omzet SaaS</p>
+                <p className="text-[10px] font-extrabold text-zinc-450 uppercase tracking-widest mt-2.5">Total Omzet SaaS</p>
               </div>
 
             </div>
 
             {/* Quick Summary Tables */}
             <div className="grid grid-cols-1 lg:grid-cols-2 gap-8">
-              
+
               {/* Recent Schools */}
               <div className="rounded-2xl border border-zinc-200 bg-white p-6 shadow-sm space-y-4">
                 <div className="flex justify-between items-center">
@@ -480,8 +540,8 @@ export default function SuperAdminDashboard() {
               <h3 className="text-lg font-bold text-zinc-800">Daftar Lembaga Sekolah</h3>
               <div className="relative w-full sm:w-72">
                 <Search className="absolute left-3 top-2.5 h-4.5 w-4.5 text-zinc-400" />
-                <input 
-                  type="text" 
+                <input
+                  type="text"
                   placeholder="Cari sekolah atau subdomain..."
                   value={schoolSearch}
                   onChange={(e) => setSchoolSearch(e.target.value)}
@@ -512,13 +572,22 @@ export default function SuperAdminDashboard() {
                       <td className="px-6 py-4.5 font-bold text-zinc-850">{s.name}</td>
                       <td className="px-6 py-4.5 text-zinc-650 font-semibold">{s.npsn || '-'}</td>
                       <td className="px-6 py-4.5 font-bold text-[#aa8410] uppercase">{s.level}</td>
-                      <td className="px-6 py-4.5 text-indigo-600 font-semibold">{s.subdomain}.{getBaseDomain()}</td>
+                      <td className="px-6 py-4.5 text-indigo-650 font-semibold">
+                        <a
+                          href={`http://${s.subdomain}.${getBaseDomain()}${window.location.port ? `:${window.location.port}` : ''}`}
+                          target="_blank"
+                          rel="noopener noreferrer"
+                          className="hover:underline font-bold"
+                        >
+                          {s.subdomain}.{getBaseDomain()} ↗
+                        </a>
+                      </td>
                       <td className="px-6 py-4.5 text-zinc-700 font-semibold">{s.admin_name || '-'}</td>
                       <td className="px-6 py-4.5 text-zinc-700 font-semibold">
                         {s.phone ? (
-                          <a 
-                            href={`https://wa.me/${s.phone.replace(/[^0-9]/g, '')}`} 
-                            target="_blank" 
+                          <a
+                            href={`https://wa.me/${s.phone.replace(/[^0-9]/g, '')}`}
+                            target="_blank"
                             rel="noopener noreferrer"
                             className="text-green-600 hover:underline font-bold"
                           >
@@ -544,12 +613,21 @@ export default function SuperAdminDashboard() {
                       </td>
                       <td className="px-6 py-4.5 text-right">
                         <div className="flex items-center justify-end gap-2">
-                          <button
+                           <button
                             onClick={() => handleViewDetail(s.id)}
                             title="Detail Sekolah"
                             className="rounded-lg border border-[#aa8410]/20 bg-[#aa8410]/5 hover:bg-[#aa8410]/15 p-2 text-[#aa8410] shadow-sm transition-all"
                           >
                             <Eye className="h-4 w-4" />
+                          </button>
+                          <button
+                            onClick={() => handleOpenEdit(s)}
+                            title="Edit Data Sekolah"
+                            className="rounded-lg border border-indigo-200 bg-indigo-50 hover:bg-indigo-100 p-2 text-indigo-700 shadow-sm transition-all"
+                          >
+                            <svg className="h-4 w-4" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
+                              <path strokeLinecap="round" strokeLinejoin="round" d="M15.232 5.232l3.536 3.536m-2.036-5.036a2.5 2.5 0 113.536 3.536L6.5 21.036H3v-3.572L16.732 3.732z" />
+                            </svg>
                           </button>
                           <button
                             disabled={impersonatingId !== null}
@@ -598,8 +676,8 @@ export default function SuperAdminDashboard() {
               <h3 className="text-lg font-bold text-zinc-800">Log Transaksi Langganan</h3>
               <div className="relative w-full sm:w-72">
                 <Search className="absolute left-3 top-2.5 h-4.5 w-4.5 text-zinc-400" />
-                <input 
-                  type="text" 
+                <input
+                  type="text"
                   placeholder="Cari invoice atau sekolah..."
                   value={invoiceSearch}
                   onChange={(e) => setInvoiceSearch(e.target.value)}
@@ -688,17 +766,17 @@ export default function SuperAdminDashboard() {
                 <tbody className="divide-y divide-zinc-100 text-xs">
                   {features.map(f => (
                     <tr key={f.id} className="hover:bg-zinc-50/40">
-                      <td className="px-6 py-4.5 font-bold text-zinc-800 flex items-center justify-between gap-4">
+                      <td className="px-6 py-4.5 font-bold text-zinc-800 flex items-center justify-between gap-4 whitespace-nowrap">
                         <span>{f.feature_name}</span>
                         <button
                           onClick={() => handleDeleteFeature(f.id)}
-                          className="text-red-500 hover:text-red-750 p-1 hover:bg-red-50 rounded-lg transition-colors"
+                          className="text-red-500 hover:text-red-750 p-1 hover:bg-red-50 rounded-lg transition-colors ml-2 shrink-0"
                           title="Hapus Fitur"
                         >
                           <Trash2 className="h-4.5 w-4.5" />
                         </button>
                       </td>
-                      
+
                       {/* TK */}
                       <td className="px-6 py-4.5 text-center">
                         <button
@@ -824,8 +902,8 @@ export default function SuperAdminDashboard() {
               <h3 className="text-lg font-bold text-zinc-800">Manajemen Pengajuan Custom Domain</h3>
               <div className="relative w-full sm:w-72">
                 <Search className="absolute left-3 top-2.5 h-4.5 w-4.5 text-zinc-400" />
-                <input 
-                  type="text" 
+                <input
+                  type="text"
                   placeholder="Cari domain atau sekolah..."
                   value={domainSearch}
                   onChange={(e) => setDomainSearch(e.target.value)}
@@ -870,14 +948,13 @@ export default function SuperAdminDashboard() {
                         </td>
                         <td className="px-6 py-4">
                           {req.document_file ? (
-                            <a 
-                              href={`${BACKEND_BASE}/${req.document_file}`}
-                              target="_blank"
-                              rel="noopener noreferrer"
+                            <button
+                              type="button"
+                              onClick={() => downloadDomainDocument(req)}
                               className="inline-flex items-center gap-1 text-[#aa8410] hover:text-[#c5a028] font-bold hover:underline"
                             >
                               <FileText className="h-4.5 w-4.5" /> Unduh Berkas
-                            </a>
+                            </button>
                           ) : (
                             <span className="text-zinc-400 font-light italic">Tidak ada berkas</span>
                           )}
@@ -954,8 +1031,8 @@ export default function SuperAdminDashboard() {
                 <School className="h-6 w-6 text-[#aa8410]" />
                 <h3 className="text-lg font-extrabold text-zinc-950">Detail Lembaga Sekolah</h3>
               </div>
-              <button 
-                onClick={() => setShowDetailModal(false)} 
+              <button
+                onClick={() => setShowDetailModal(false)}
                 className="rounded-lg p-1 text-zinc-500 hover:bg-zinc-100 hover:text-zinc-800 transition-all"
               >
                 <X className="h-5 w-5" />
@@ -969,7 +1046,7 @@ export default function SuperAdminDashboard() {
               </div>
             ) : selectedSchoolDetail ? (
               <div className="space-y-6">
-                
+
                 {/* School Header Info */}
                 <div className="bg-zinc-50 rounded-2xl p-5 border border-zinc-150 space-y-3">
                   <h4 className="text-xl font-black text-zinc-900">{selectedSchoolDetail.school.name}</h4>
@@ -997,7 +1074,7 @@ export default function SuperAdminDashboard() {
                       <div>
                         <p className="text-[10px] font-bold uppercase tracking-wider text-indigo-600">Paket Aktif</p>
                         <p className="font-extrabold text-zinc-900 uppercase mt-0.5">
-                          {selectedSchoolDetail.subscription.plan_name} 
+                          {selectedSchoolDetail.subscription.plan_name}
                           {selectedSchoolDetail.subscription.plan_type === 'trial' ? ' (Uji Coba 7 Hari)' : ' (Berbayar)'}
                         </p>
                       </div>
@@ -1054,7 +1131,7 @@ export default function SuperAdminDashboard() {
 
                 {/* Additional Info */}
                 <div className="pt-4 border-t border-zinc-200 flex justify-end">
-                  <button 
+                  <button
                     onClick={() => setShowDetailModal(false)}
                     className="rounded-xl border border-zinc-200 bg-white hover:bg-zinc-50 px-5 py-2.5 text-xs font-bold text-zinc-700 transition-all"
                   >
@@ -1078,8 +1155,8 @@ export default function SuperAdminDashboard() {
           <div className="w-full max-w-md rounded-2xl border border-zinc-200 bg-white p-6 shadow-2xl space-y-6">
             <div className="flex items-center justify-between border-b border-zinc-200 pb-3">
               <h3 className="text-lg font-extrabold text-zinc-950">Tambah Fitur Baru</h3>
-              <button 
-                onClick={() => setShowCreateFeatureModal(false)} 
+              <button
+                onClick={() => setShowCreateFeatureModal(false)}
                 className="rounded-lg p-1 text-zinc-500 hover:bg-zinc-100 hover:text-zinc-800 transition-all"
               >
                 <X className="h-5 w-5" />
@@ -1089,7 +1166,7 @@ export default function SuperAdminDashboard() {
             <form onSubmit={handleCreateFeature} className="space-y-4">
               <div>
                 <label className="block text-xs font-bold text-zinc-600 uppercase">Nama Fitur</label>
-                <input 
+                <input
                   type="text"
                   placeholder="Contoh: Laporan Keuangan"
                   value={newFeatureName}
@@ -1101,7 +1178,7 @@ export default function SuperAdminDashboard() {
 
               <div>
                 <label className="block text-xs font-bold text-zinc-600 uppercase">Key Fitur (Unique & Lowercase)</label>
-                <input 
+                <input
                   type="text"
                   placeholder="Contoh: laporan_keuangan"
                   value={newFeatureKey}
@@ -1112,14 +1189,14 @@ export default function SuperAdminDashboard() {
               </div>
 
               <div className="pt-4 border-t border-zinc-100 flex justify-end gap-3">
-                <button 
+                <button
                   type="button"
                   onClick={() => setShowCreateFeatureModal(false)}
                   className="rounded-xl border border-zinc-200 bg-white hover:bg-zinc-50 px-4 py-2.5 text-xs font-bold text-zinc-700 transition-all"
                 >
                   Batal
                 </button>
-                <button 
+                <button
                   type="submit"
                   className="rounded-xl bg-[#d4af37] hover:bg-[#f3cb65] px-5 py-2.5 text-xs font-bold text-black shadow-sm transition-all"
                 >
@@ -1137,8 +1214,8 @@ export default function SuperAdminDashboard() {
           <div className="w-full max-w-md rounded-2xl border border-zinc-200 bg-white p-6 shadow-2xl space-y-4">
             <div className="flex items-center justify-between border-b border-zinc-200 pb-2">
               <h3 className="text-base font-extrabold text-zinc-950">Tolak Pengajuan Domain</h3>
-              <button 
-                onClick={() => setRejectingRequestId(null)} 
+              <button
+                onClick={() => setRejectingRequestId(null)}
                 className="rounded-lg p-1 text-zinc-500 hover:bg-zinc-100 hover:text-zinc-800 transition-all"
               >
                 <X className="h-5 w-5" />
@@ -1148,7 +1225,7 @@ export default function SuperAdminDashboard() {
             <form onSubmit={handleRejectDomain} className="space-y-4">
               <div className="space-y-1">
                 <label className="block text-xs font-bold text-zinc-650">Alasan Penolakan</label>
-                <textarea 
+                <textarea
                   rows="3"
                   placeholder="Contoh: Dokumen SK Pendirian Sekolah tidak terbaca / salah upload."
                   value={rejectionNote}
@@ -1159,18 +1236,131 @@ export default function SuperAdminDashboard() {
               </div>
 
               <div className="pt-2 flex justify-end gap-2 text-xs">
-                <button 
+                <button
                   type="button"
                   onClick={() => setRejectingRequestId(null)}
                   className="rounded-xl border border-zinc-200 bg-white hover:bg-zinc-50 px-4 py-2 transition-all font-bold text-zinc-700"
                 >
                   Batal
                 </button>
-                <button 
+                <button
                   type="submit"
                   className="rounded-xl bg-red-600 hover:bg-red-555 px-5 py-2 font-bold text-white shadow-sm transition-all"
                 >
                   Tolak Pengajuan
+                </button>
+              </div>
+            </form>
+          </div>
+        </div>
+      )}
+
+      {/* Edit School Modal */}
+      {showEditModal && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/60 backdrop-blur-sm p-4">
+          <div className="w-full max-w-md rounded-2xl border border-zinc-200 bg-white p-6 shadow-2xl space-y-4">
+            <div className="flex items-center justify-between border-b border-zinc-150 pb-3">
+              <h3 className="text-base font-extrabold text-zinc-950">✏️ Edit Lembaga Sekolah</h3>
+              <button
+                onClick={() => setShowEditModal(false)}
+                className="rounded-lg p-1 text-zinc-500 hover:bg-zinc-100 hover:text-zinc-800 transition-all"
+              >
+                <X className="h-5 w-5" />
+              </button>
+            </div>
+
+            <form onSubmit={handleSaveSchoolEdit} className="space-y-4">
+              <div>
+                <label className="block text-xs font-bold text-zinc-650">Nama Lembaga Sekolah</label>
+                <input
+                  type="text"
+                  value={editSchoolName}
+                  onChange={(e) => setEditSchoolName(e.target.value)}
+                  className="mt-1.5 w-full rounded-xl border border-zinc-200 px-4 py-2.5 text-xs font-semibold focus:outline-none focus:border-[#d4af37]"
+                  required
+                />
+              </div>
+
+              <div className="grid grid-cols-2 gap-4">
+                <div>
+                  <label className="block text-xs font-bold text-zinc-650">NPSN</label>
+                  <input
+                    type="text"
+                    value={editNpsn}
+                    onChange={(e) => setEditNpsn(e.target.value)}
+                    className="mt-1.5 w-full rounded-xl border border-zinc-200 px-4 py-2.5 text-xs font-semibold focus:outline-none focus:border-[#d4af37]"
+                  />
+                </div>
+                <div>
+                  <label className="block text-xs font-bold text-zinc-650">Jenjang</label>
+                  <select
+                    value={editLevel}
+                    onChange={(e) => setEditLevel(e.target.value)}
+                    className="mt-1.5 w-full rounded-xl border border-zinc-200 px-4 py-2.5 text-xs font-semibold focus:outline-none focus:border-[#d4af37] bg-white"
+                  >
+                    <option value="TK">TK / PAUD</option>
+                    <option value="SD">SD</option>
+                    <option value="SMP">SMP</option>
+                    <option value="SMA">SMA</option>
+                    <option value="SMK">SMK</option>
+                    <option value="PESANTREN">Pesantren</option>
+                    <option value="MTS_MA">MTS / MA</option>
+                  </select>
+                </div>
+              </div>
+
+              <div>
+                <label className="block text-xs font-bold text-zinc-650">Subdomain</label>
+                <div className="mt-1.5 flex rounded-xl border border-zinc-200 bg-zinc-50 overflow-hidden focus-within:border-[#d4af37]">
+                  <input
+                    type="text"
+                    value={editSubdomain}
+                    onChange={(e) => setEditSubdomain(e.target.value)}
+                    className="flex-1 bg-transparent px-4 py-2.5 text-xs font-semibold outline-none"
+                    required
+                  />
+                  <span className="bg-zinc-150 px-3 py-2.5 text-xs text-zinc-500 font-mono border-l border-zinc-200">
+                    .{getBaseDomain()}
+                  </span>
+                </div>
+              </div>
+
+              <div>
+                <label className="block text-xs font-bold text-zinc-650">Kepala Sekolah / Admin Utama</label>
+                <input
+                  type="text"
+                  value={editAdminName}
+                  onChange={(e) => setEditAdminName(e.target.value)}
+                  className="mt-1.5 w-full rounded-xl border border-zinc-200 px-4 py-2.5 text-xs font-semibold focus:outline-none focus:border-[#d4af37]"
+                  required
+                />
+              </div>
+
+              <div>
+                <label className="block text-xs font-bold text-zinc-650">Nomor WhatsApp Notifikasi</label>
+                <input
+                  type="text"
+                  value={editPhone}
+                  onChange={(e) => setEditPhone(e.target.value)}
+                  className="mt-1.5 w-full rounded-xl border border-zinc-200 px-4 py-2.5 text-xs font-semibold focus:outline-none focus:border-[#d4af37]"
+                />
+              </div>
+
+              <div className="pt-4 border-t border-zinc-100 flex justify-end gap-3">
+                <button
+                  type="button"
+                  onClick={() => setShowEditModal(false)}
+                  className="rounded-xl border border-zinc-200 bg-white hover:bg-zinc-50 px-4 py-2.5 text-xs font-bold text-zinc-700 transition-all"
+                >
+                  Batal
+                </button>
+                <button
+                  type="submit"
+                  disabled={savingSchool}
+                  className="rounded-xl bg-[#d4af37] hover:bg-[#f3cb65] px-5 py-2.5 text-xs font-bold text-black shadow-sm transition-all flex items-center gap-1.5"
+                >
+                  {savingSchool && <Loader2 className="h-4.5 w-4.5 animate-spin" />}
+                  Simpan Perubahan
                 </button>
               </div>
             </form>

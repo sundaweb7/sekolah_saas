@@ -41,20 +41,19 @@ class BillingController extends BaseResourceController
         // Load subscription detail from subscriptions table
         $subscription = $this->subscriptionModel->where('school_id', $schoolId)->where('status', 'active')->first();
         
-        $planName = $subscription ? $subscription->plan_name : 'premium'; // default trial is premium
+        $resolvedPlan = (new \App\Services\PlanService())->activePlan((int) $schoolId);
+        $planName = $resolvedPlan === 'trial' ? 'premium' : $resolvedPlan;
         $expiresAt = $subscription ? $subscription->end_date : date('Y-m-d H:i:s', strtotime('+7 days', strtotime($school->created_at)));
-        $planType = $subscription ? 'paid' : 'trial';
+        $planType = $subscription ? 'paid' : ($resolvedPlan === 'trial' ? 'trial' : 'expired');
 
         // Quota usage checks
         $studentModel = new StudentModel();
         $totalStudents = $studentModel->where('school_id', $schoolId)->countAllResults();
 
         // Fitur batas kuota per plan
-        $quotas = [
-            'basic'    => ['students' => 9999, 'storage' => '1 GB', 'price' => 25000],
-            'standard' => ['students' => 100, 'storage' => '5 GB', 'price' => 50000],
-            'premium'  => ['students' => 300, 'storage' => 'Unlimited', 'price' => 100000],
-        ];
+        $quotas = array_map(static fn ($plan) => [
+            'students' => $plan['students'], 'storage' => $plan['storage'], 'price' => $plan['monthly'],
+        ], \App\Services\PlanService::CATALOG);
 
         return $this->respondSuccess([
             'school' => [
@@ -85,20 +84,7 @@ class BillingController extends BaseResourceController
         $billingCycle = $this->request->getVar('billing_cycle') ?? 'monthly';
         $paymentMethod = $this->request->getVar('payment_method') ?? 'MY_VIRTUAL_ACCOUNT';
 
-        $plans = [
-            'basic' => [
-                'monthly' => 25000,
-                'yearly'  => 300000
-            ],
-            'standard' => [
-                'monthly' => 50000,
-                'yearly'  => 600000
-            ],
-            'premium' => [
-                'monthly' => 100000,
-                'yearly'  => 1000000
-            ]
-        ];
+        $plans = \App\Services\PlanService::CATALOG;
 
         if (!isset($plans[$planName])) {
             return $this->respondError('Invalid subscription plan name', ResponseInterface::HTTP_BAD_REQUEST);
@@ -127,16 +113,22 @@ class BillingController extends BaseResourceController
         $invoice = $this->invoiceModel->find($invoiceId);
 
         // Initiate payment with Tripay gateway service
-        $tripayRes = $this->tripayService->createPayment(
-            $invoice->invoice_number, 
-            $amount, 
-            $planName, 
-            $paymentMethod, 
-            [
-                'name' => $user->full_name,
-                'email' => $user->email
-            ]
-        );
+        try {
+            $tripayRes = $this->tripayService->createPayment(
+                $invoice->invoice_number,
+                $amount,
+                $planName,
+                $paymentMethod,
+                ['name' => $user->full_name, 'email' => $user->email]
+            );
+            if (empty($tripayRes['data']['reference'])) {
+                throw new \RuntimeException('Payment provider returned an incomplete response.');
+            }
+        } catch (\Throwable $e) {
+            $db->transRollback();
+            log_message('error', 'Subscription checkout failed: {message}', ['message' => $e->getMessage()]);
+            return $this->respondError('Payment provider is currently unavailable', ResponseInterface::HTTP_SERVICE_UNAVAILABLE);
+        }
 
         // Update invoice with Tripay reference and checkout details
         $this->invoiceModel->update($invoiceId, [
@@ -176,8 +168,7 @@ class BillingController extends BaseResourceController
         $receivedSignature = $this->request->getServer('HTTP_X_CALLBACK_SIGNATURE');
 
         if (empty($receivedSignature) || !$this->tripayService->verifyCallbackSignature($callbackJson, $receivedSignature)) {
-            // Logically return bad signature or mock success for testing environment
-            // Return signature validation error
+            return $this->respondError('Invalid callback signature', ResponseInterface::HTTP_UNAUTHORIZED);
         }
 
         $callbackData = json_decode($callbackJson, true);
@@ -197,21 +188,48 @@ class BillingController extends BaseResourceController
         if (!$invoice || $invoice->status === 'paid') {
             return $this->respondSuccess(['success' => true, 'message' => 'Invoice already processed or not found']);
         }
+        $callbackReference = $callbackData['reference'] ?? '';
+        if (!empty($invoice->tripay_reference) && !hash_equals((string) $invoice->tripay_reference, (string) $callbackReference)) {
+            return $this->respondError('Payment reference does not match invoice', ResponseInterface::HTTP_BAD_REQUEST);
+        }
+        $paidAmount = $callbackData['total_amount'] ?? $callbackData['amount'] ?? null;
+        if ($paidAmount === null || (int) $paidAmount !== (int) $invoice->amount) {
+            return $this->respondError('Payment amount does not match invoice', ResponseInterface::HTTP_BAD_REQUEST);
+        }
 
         $db = \Config\Database::connect();
         $db->transStart();
 
-        // 1. Mark Invoice as PAID
-        $this->invoiceModel->update($invoice->id, [
+        // 1. Atomically mark Invoice as PAID. A repeated callback will not
+        // create another subscription.
+        $this->invoiceModel->where('id', $invoice->id)->where('status !=', 'paid')->set([
             'status'  => 'paid',
             'paid_at' => date('Y-m-d H:i:s')
-        ]);
+        ])->update();
+
+        if ($db->affectedRows() !== 1) {
+            $db->transRollback();
+            return $this->respondSuccess(['success' => true, 'message' => 'Invoice already processed']);
+        }
 
         // 2. Set Active Subscription & School Expire Dates
         $schoolId = $invoice->school_id;
         $isYearly = (strtolower($invoice->billing_cycle) === 'yearly');
-        $expiryDays = $isYearly ? '+365 days' : '+30 days';
-        $expiryDate = date('Y-m-d H:i:s', strtotime($expiryDays));
+        $activeSubscription = $this->subscriptionModel
+            ->where('school_id', $schoolId)
+            ->where('status', 'active')
+            ->orderBy('end_date', 'DESC')
+            ->first();
+        $baseTimestamp = $activeSubscription && strtotime($activeSubscription->end_date) > time()
+            ? strtotime($activeSubscription->end_date)
+            : time();
+        $expiryDays = $isYearly ? '+1 year' : '+1 month';
+        $expiryDate = date('Y-m-d', strtotime($expiryDays, $baseTimestamp));
+
+        $this->subscriptionModel->where('school_id', $schoolId)
+            ->where('status', 'active')
+            ->set(['status' => 'expired'])
+            ->update();
 
         $this->schoolModel->update($schoolId, [
             'subscription_plan' => $invoice->plan_name,
@@ -222,6 +240,7 @@ class BillingController extends BaseResourceController
         $this->subscriptionModel->insert([
             'school_id'  => $schoolId,
             'plan_name'  => $invoice->plan_name,
+            'billing_cycle' => $invoice->billing_cycle,
             'start_date' => date('Y-m-d'),
             'end_date'   => $expiryDate,
             'status'     => 'active'
@@ -230,8 +249,18 @@ class BillingController extends BaseResourceController
         $db->transComplete();
 
         if ($db->transStatus() === false) {
-            return $this->respondSuccess(['success' => false, 'message' => 'Failed to process database records']);
+            return $this->respondError('Failed to process payment records', ResponseInterface::HTTP_INTERNAL_SERVER_ERROR);
         }
+
+        (new \App\Models\AuditLogModel())->insert([
+            'school_id' => $schoolId,
+            'role' => 'payment_gateway',
+            'action' => 'payment:subscription:paid',
+            'method' => 'WEBHOOK',
+            'path' => 'billing/webhook',
+            'status_code' => 200,
+            'created_at' => date('Y-m-d H:i:s'),
+        ]);
 
         // Trigger WhatsApp Notification for Payment Success
         $userModel = new \App\Models\UserModel();
