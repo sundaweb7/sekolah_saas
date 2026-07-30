@@ -3,7 +3,7 @@ import api from '../../config/axios';
 import SuperAdminLayout from '../../layouts/SuperAdminLayout';
 import {
   School, CreditCard, Shield, Users, Loader2, AlertCircle,
-  CheckCircle, XCircle, Search, Calendar, DollarSign, Eye, X, LogIn, Power, Plus, Trash2, FileText
+  CheckCircle, XCircle, Search, Calendar, DollarSign, Eye, X, LogIn, Power, Plus, Trash2, FileText, Key
 } from 'lucide-react';
 
 function getBackendBase() {
@@ -58,6 +58,11 @@ export default function SuperAdminDashboard() {
 
   // Status updating state
   const [updatingSchoolId, setUpdatingSchoolId] = useState(null);
+
+  // Reset Password states
+  const [resetPasswordSchool, setResetPasswordSchool] = useState(null);
+  const [newPassword, setNewPassword] = useState('');
+  const [resettingPassword, setResettingPassword] = useState(false);
   const [clearingCache, setClearingCache] = useState(false);
 
   // Detail Modal States
@@ -246,6 +251,25 @@ export default function SuperAdminDashboard() {
       fetchData();
     } catch (err) {
       alert(err.response?.data?.message || 'Gagal menolak pengajuan domain.');
+    }
+  };
+
+  const handleResetPassword = async (e) => {
+    e.preventDefault();
+    if (newPassword.length < 8) {
+      alert('Password baru minimal harus 8 karakter.');
+      return;
+    }
+    setResettingPassword(true);
+    try {
+      await api.post(`/superadmin/schools/reset-password/${resetPasswordSchool.id}`, { password: newPassword });
+      alert(`Password untuk Administrator utama ${resetPasswordSchool.name} berhasil direset.`);
+      setResetPasswordSchool(null);
+      setNewPassword('');
+    } catch (err) {
+      alert(err.response?.data?.message || err.message || 'Gagal mereset password.');
+    } finally {
+      setResettingPassword(false);
     }
   };
 
@@ -640,6 +664,13 @@ export default function SuperAdminDashboard() {
                             ) : (
                               <LogIn className="h-4 w-4" />
                             )}
+                          </button>
+                          <button
+                            onClick={() => setResetPasswordSchool(s)}
+                            title="Reset Password Admin"
+                            className="rounded-lg border border-amber-200 bg-amber-50 hover:bg-amber-100 p-2 text-amber-700 shadow-sm transition-all"
+                          >
+                            <Key className="h-4 w-4" />
                           </button>
                           <button
                             disabled={updatingSchoolId === s.id}
@@ -1361,6 +1392,62 @@ export default function SuperAdminDashboard() {
                 >
                   {savingSchool && <Loader2 className="h-4.5 w-4.5 animate-spin" />}
                   Simpan Perubahan
+                </button>
+              </div>
+            </form>
+          </div>
+        </div>
+      )}
+      {/* Reset Password Modal */}
+      {resetPasswordSchool && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/50 p-4 backdrop-blur-sm animate-fade-in">
+          <div className="w-full max-w-md rounded-2xl border border-zinc-200 bg-white p-6 shadow-2xl space-y-4">
+            <div className="flex items-center justify-between pb-3 border-b border-zinc-150">
+              <h3 className="text-sm font-black text-zinc-900 flex items-center gap-2">
+                <Key className="h-4.5 w-4.5 text-amber-600" /> Reset Password Administrator
+              </h3>
+              <button 
+                onClick={() => setResetPasswordSchool(null)}
+                className="rounded-lg p-1 text-zinc-400 hover:bg-zinc-100 hover:text-zinc-650"
+              >
+                <X className="h-4 w-4" />
+              </button>
+            </div>
+
+            <form onSubmit={handleResetPassword} className="space-y-4">
+              <div>
+                <p className="text-xs text-zinc-550 leading-relaxed">
+                  Anda akan mereset password administrator utama untuk sekolah <span className="font-extrabold text-zinc-800">{resetPasswordSchool.name}</span>.
+                </p>
+              </div>
+
+              <div>
+                <label className="block text-xs font-bold text-zinc-650">Kata Sandi Baru</label>
+                <input
+                  type="password"
+                  placeholder="Minimal 8 karakter..."
+                  value={newPassword}
+                  onChange={(e) => setNewPassword(e.target.value)}
+                  className="mt-1.5 w-full rounded-xl border border-zinc-200 px-4 py-2.5 text-xs font-semibold focus:outline-none focus:border-[#d4af37]"
+                  required
+                />
+              </div>
+
+              <div className="pt-3 border-t border-zinc-100 flex justify-end gap-3">
+                <button
+                  type="button"
+                  onClick={() => setResetPasswordSchool(null)}
+                  className="rounded-xl border border-zinc-200 bg-white hover:bg-zinc-50 px-4 py-2.5 text-xs font-bold text-zinc-700 transition-all"
+                >
+                  Batal
+                </button>
+                <button
+                  type="submit"
+                  disabled={resettingPassword}
+                  className="rounded-xl bg-amber-600 hover:bg-amber-500 px-5 py-2.5 text-xs font-bold text-white shadow-sm transition-all flex items-center gap-1.5"
+                >
+                  {resettingPassword && <Loader2 className="h-4.5 w-4.5 animate-spin" />}
+                  Reset Password
                 </button>
               </div>
             </form>

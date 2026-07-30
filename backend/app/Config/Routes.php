@@ -62,6 +62,7 @@ $routes->group('api/v1', ['filter' => 'tenant'], function (RouteCollection $rout
         $routes->get('schools', 'SuperAdmin\SuperAdminController::schools');
         $routes->post('schools/status/(:num)', 'SuperAdmin\SuperAdminController::updateSchoolStatus/$1');
         $routes->post('schools/update/(:num)', 'SuperAdmin\SuperAdminController::updateSchool/$1');
+        $routes->post('schools/reset-password/(:num)', 'SuperAdmin\SuperAdminController::resetSchoolAdminPassword/$1');
         $routes->get('invoices', 'SuperAdmin\SuperAdminController::invoices');
         $routes->post('cache/clear', 'SuperAdmin\SuperAdminController::clearCache');
         $routes->post('impersonate/(:num)', 'SuperAdmin\SuperAdminController::impersonate/$1');

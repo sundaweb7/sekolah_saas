@@ -503,4 +503,32 @@ class SuperAdminController extends BaseResourceController
             'domain-request-' . $request->id . '.' . pathinfo($file, PATHINFO_EXTENSION)
         );
     }
+
+    /**
+     * POST /api/v1/superadmin/schools/reset-password/(:num)
+     * Resets the password of the primary administrator for a given school.
+     */
+    public function resetSchoolAdminPassword(int $schoolId): ResponseInterface
+    {
+        $json     = $this->request->getJSON(true) ?? [];
+        $password = trim((string) ($json['password'] ?? ''));
+
+        if (strlen($password) < 8) {
+            return $this->respondError('Password baru minimal harus 8 karakter.', 422);
+        }
+
+        // Cari admin utama sekolah ini (role='admin' dan school_id = $schoolId)
+        $userModel = new \App\Models\UserModel();
+        $admin = $userModel->where('school_id', $schoolId)->where('role', 'admin')->first();
+        
+        if (!$admin) {
+            return $this->respondError('Akun Administrator Sekolah tidak ditemukan.', 404);
+        }
+
+        $userModel->update($admin->id, [
+            'password_hash' => password_hash($password, PASSWORD_BCRYPT)
+        ]);
+
+        return $this->respondSuccess(null, "Password untuk administrator {$admin->full_name} ({$admin->email}) berhasil direset.");
+    }
 }
